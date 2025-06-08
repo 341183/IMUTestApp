@@ -3,72 +3,80 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:views="clr-namespace:IMUTestApp.Views"
         Title="IMU测试程序" 
-        MinHeight="600" MinWidth="800"
+        MinHeight="500" MinWidth="700" Width="1200" Height="800"
         WindowStartupLocation="CenterScreen">
     
     <Window.Resources>
+        <!-- 优化的内容区域样式 - 移除最大宽度限制 -->
+        <Style x:Key="ContentAreaStyle" TargetType="UserControl">
+            <Setter Property="HorizontalAlignment" Value="Stretch"/>
+            <Setter Property="VerticalAlignment" Value="Stretch"/>
+            <Setter Property="Margin" Value="10"/>
+        </Style>
+        
         <!-- 导航按钮样式 -->
         <Style x:Key="NavButtonStyle" TargetType="Button">
             <Setter Property="Background" Value="Transparent"/>
             <Setter Property="BorderBrush" Value="#FFCCCCCC"/>
             <Setter Property="BorderThickness" Value="1"/>
-            <Setter Property="Padding" Value="12,8"/>
+            <Setter Property="Padding" Value="15,10"/>
             <Setter Property="HorizontalAlignment" Value="Stretch"/>
             <Setter Property="HorizontalContentAlignment" Value="Left"/>
             <Setter Property="Margin" Value="5,3"/>
-            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="FontSize" Value="14"/>
             <Setter Property="Cursor" Value="Hand"/>
             <Style.Triggers>
                 <Trigger Property="IsMouseOver" Value="True">
-                    <Setter Property="Background" Value="#FFE0E0E0"/>
+                    <Setter Property="Background" Value="#FFE3F2FD"/>
+                    <Setter Property="BorderBrush" Value="#FF2196F3"/>
                 </Trigger>
                 <Trigger Property="IsPressed" Value="True">
-                    <Setter Property="Background" Value="#FFD0D0D0"/>
+                    <Setter Property="Background" Value="#FFBBDEFB"/>
                 </Trigger>
             </Style.Triggers>
         </Style>
         
         <!-- 数据模板 -->
         <DataTemplate x:Key="TestViewTemplate">
-            <views:TestView DataContext="{Binding TestViewModel}"/>
+            <views:TestView DataContext="{Binding TestViewModel}" Style="{StaticResource ContentAreaStyle}"/>
         </DataTemplate>
         
         <DataTemplate x:Key="ConfigViewTemplate">
-            <views:ConfigView DataContext="{Binding ConfigViewModel}"/>
+            <views:ConfigView DataContext="{Binding ConfigViewModel}" Style="{StaticResource ContentAreaStyle}"/>
         </DataTemplate>
         
         <DataTemplate x:Key="SettingsViewTemplate">
-            <views:SettingsView DataContext="{Binding SettingsViewModel}"/>
+            <views:SettingsView DataContext="{Binding SettingsViewModel}" Style="{StaticResource ContentAreaStyle}"/>
         </DataTemplate>
     </Window.Resources>
     
     <Grid>
         <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="160" MinWidth="140" MaxWidth="180"/>
+            <ColumnDefinition Width="220"/>
             <ColumnDefinition Width="*"/>
         </Grid.ColumnDefinitions>
         
         <!-- 左侧导航栏 -->
-        <Border Grid.Column="0" Background="#FFF8F8F8" BorderBrush="#FFDDDDDD" BorderThickness="0,0,1,0">
-            <StackPanel Margin="8">
+        <Border Grid.Column="0" Background="#FFF8F9FA" BorderBrush="#FFDDDDDD" BorderThickness="0,0,1,0">
+            <StackPanel Margin="15">
                 <!-- 程序标题 -->
                 <TextBlock Text="IMU测试程序" 
-                         FontSize="14" 
+                         FontSize="16" 
                          FontWeight="Bold" 
                          HorizontalAlignment="Center" 
-                         Margin="0,8,0,15"
+                         Margin="0,10,0,20"
                          TextWrapping="Wrap"/>
                 
                 <!-- 导航按钮 -->
-                <Button Content="测试" 
+                <Button Content="📊 数据测试" 
                         Command="{Binding ShowTestViewCommand}"
                         Style="{StaticResource NavButtonStyle}"/>
                 
-                <Button Content="配置" 
+                <Button Content="⚙️ 设备配置" 
                         Command="{Binding ShowConfigViewCommand}"
                         Style="{StaticResource NavButtonStyle}"/>
                         
-                <Button Content="设置" 
+                <Button Content="🔧 系统设置" 
                         Command="{Binding ShowSettingsViewCommand}"
                         Style="{StaticResource NavButtonStyle}"/>
                 
@@ -76,24 +84,25 @@
                 <Border Background="White" 
                         BorderBrush="#FFDDDDDD" 
                         BorderThickness="1" 
-                        Margin="0,20,0,0" 
-                        Padding="8">
+                        CornerRadius="5"
+                        Margin="0,30,0,0" 
+                        Padding="12">
                     <StackPanel>
-                        <TextBlock Text="连接状态" 
+                        <TextBlock Text="🔗 连接状态" 
                                  FontWeight="Bold" 
-                                 FontSize="12"
-                                 Margin="0,0,0,4"/>
+                                 FontSize="13"
+                                 Margin="0,0,0,6"/>
                         <TextBlock Text="{Binding DeviceStatus}" 
-                                 Foreground="Red" 
-                                 FontSize="11"
-                                 TextWrapping="Wrap"/>
-                        <TextBlock Text="数据状态" 
-                                 FontWeight="Bold" 
+                                 Foreground="#FFDC3545" 
                                  FontSize="12"
-                                 Margin="0,8,0,4"/>
+                                 TextWrapping="Wrap"/>
+                        <TextBlock Text="📡 数据状态" 
+                                 FontWeight="Bold" 
+                                 FontSize="13"
+                                 Margin="0,12,0,6"/>
                         <TextBlock Text="{Binding DataStatus}" 
                                  Foreground="Gray" 
-                                 FontSize="11"
+                                 FontSize="12"
                                  TextWrapping="Wrap"/>
                     </StackPanel>
                 </Border>
@@ -103,28 +112,28 @@
         <!-- 主内容区域 -->
         <Grid Grid.Column="1" Background="White">
             <Grid.RowDefinitions>
-                <RowDefinition Height="50"/>
+                <RowDefinition Height="60"/>
                 <RowDefinition Height="*"/>
             </Grid.RowDefinitions>
             
             <!-- 顶部标题栏 -->
-            <Border Grid.Row="0" Background="#FFF5F5F5" BorderBrush="#FFDDDDDD" BorderThickness="0,0,0,1">
+            <Border Grid.Row="0" Background="#FFF8F9FA" BorderBrush="#FFDDDDDD" BorderThickness="0,0,0,1">
                 <TextBlock x:Name="PageTitleText" 
-                         FontSize="16" 
+                         FontSize="18" 
                          FontWeight="Bold" 
                          VerticalAlignment="Center" 
-                         Margin="20,0">
+                         Margin="25,0">
                     <TextBlock.Style>
                         <Style TargetType="TextBlock">
                             <Style.Triggers>
                                 <DataTrigger Binding="{Binding CurrentView}" Value="Test">
-                                    <Setter Property="Text" Value="数据采集与测试"/>
+                                    <Setter Property="Text" Value="📊 数据采集与测试"/>
                                 </DataTrigger>
                                 <DataTrigger Binding="{Binding CurrentView}" Value="Config">
-                                    <Setter Property="Text" Value="设备配置管理"/>
+                                    <Setter Property="Text" Value="⚙️ 设备配置管理"/>
                                 </DataTrigger>
                                 <DataTrigger Binding="{Binding CurrentView}" Value="Settings">
-                                    <Setter Property="Text" Value="系统设置"/>
+                                    <Setter Property="Text" Value="🔧 系统设置"/>
                                 </DataTrigger>
                             </Style.Triggers>
                         </Style>

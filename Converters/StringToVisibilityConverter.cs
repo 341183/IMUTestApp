@@ -16,7 +16,8 @@ namespace IMUTestApp.Converters
         
         public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
         {
-            throw new NotImplementedException();
+            // 返回合理的默认值而不是抛出异常
+            return value is Visibility visibility && visibility == Visibility.Visible ? "" : null;
         }
     }
 }

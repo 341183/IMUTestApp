@@ -2,10 +2,14 @@ using System;
 using System.Collections.ObjectModel;
 using System.IO;
 using System.Text;
+using System.Windows;
 using System.Windows.Input;
 using System.Windows.Threading;
 using IMUTestApp.Models;
 using IMUTestApp.Services;
+using OxyPlot;
+using OxyPlot.Series;
+using OxyPlot.Axes;
 
 namespace IMUTestApp.ViewModels
 {
@@ -27,6 +31,15 @@ namespace IMUTestApp.ViewModels
         private string _testDateTime = string.Empty;
         private string _operator = "系统操作员";
         private bool _autoSaveEnabled = true;
+
+        // 图表相关属性
+        private PlotModel _plotModel;
+
+        // 🔥 新增：将图表数据作为 ViewModel 属性保存
+        public ObservableCollection<DataPoint> ChartDataPoints { get; }
+        public ObservableCollection<DataPoint> UpperLimitPoints { get; }
+        public ObservableCollection<DataPoint> LowerLimitPoints { get; }
+        public ObservableCollection<DataPoint> BaselinePoints { get; }
         
         public TestViewModel(SerialPortService serialPortService)
         {
@@ -41,10 +54,122 @@ namespace IMUTestApp.ViewModels
             
             TestData = new ObservableCollection<IMUData>();
             
+            // 🔥 初始化图表数据集合
+            ChartDataPoints = new ObservableCollection<DataPoint>();
+            UpperLimitPoints = new ObservableCollection<DataPoint>();
+            LowerLimitPoints = new ObservableCollection<DataPoint>();
+            BaselinePoints = new ObservableCollection<DataPoint>();
+            
+            // 初始化固定线条的数据点
+            InitializeFixedLines();
+            
             ClearProductCodeCommand = new RelayCommand(ClearProductCode);
         }
         
+        private void InitializeFixedLines()
+        {
+            // 上限线
+            UpperLimitPoints.Add(new DataPoint(0, 500));
+            UpperLimitPoints.Add(new DataPoint(30, 500));
+            
+            // 下限线
+            LowerLimitPoints.Add(new DataPoint(0, -500));
+            LowerLimitPoints.Add(new DataPoint(30, -500));
+            
+            // 基准线
+            BaselinePoints.Add(new DataPoint(0, 0));
+            BaselinePoints.Add(new DataPoint(30, 0));
+        }
+        
         public ObservableCollection<IMUData> TestData { get; }
+        
+        public PlotModel PlotModel
+        {
+            get
+            {
+                // 🔥 每次访问时重新创建 PlotModel，并从 ViewModel 数据源同步数据
+                var plotModel = new PlotModel
+                {
+                    Title = "IMU传感器数据相对于基准值的偏差",
+                    Background = OxyColors.White
+                };
+                
+                // 配置坐标轴
+                plotModel.Axes.Add(new LinearAxis
+                {
+                    Position = AxisPosition.Bottom,
+                    Title = "采样点",
+                    Minimum = 0,
+                    Maximum = 30,
+                    MajorStep = 5,
+                    MinorStep = 1
+                });
+                
+                plotModel.Axes.Add(new LinearAxis
+                {
+                    Position = AxisPosition.Left,
+                    Title = "偏差值",
+                    Minimum = -600,
+                    Maximum = 600,
+                    MajorStep = 200,
+                    MinorStep = 100
+                });
+                
+                // 🔥 从 ViewModel 数据源创建系列
+                var dataSeries = new LineSeries
+                {
+                    Title = "传感器数据",
+                    Color = OxyColors.Blue,
+                    StrokeThickness = 2
+                };
+                foreach (var point in ChartDataPoints)
+                {
+                    dataSeries.Points.Add(point);
+                }
+                plotModel.Series.Add(dataSeries);
+                
+                var upperLimitSeries = new LineSeries
+                {
+                    Title = "上限",
+                    Color = OxyColors.Red,
+                    StrokeThickness = 1,
+                    LineStyle = LineStyle.Dash
+                };
+                foreach (var point in UpperLimitPoints)
+                {
+                    upperLimitSeries.Points.Add(point);
+                }
+                plotModel.Series.Add(upperLimitSeries);
+                
+                var lowerLimitSeries = new LineSeries
+                {
+                    Title = "下限",
+                    Color = OxyColors.Red,
+                    StrokeThickness = 1,
+                    LineStyle = LineStyle.Dash
+                };
+                foreach (var point in LowerLimitPoints)
+                {
+                    lowerLimitSeries.Points.Add(point);
+                }
+                plotModel.Series.Add(lowerLimitSeries);
+                
+                var baselineSeries = new LineSeries
+                {
+                    Title = "基准线",
+                    Color = OxyColors.Green,
+                    StrokeThickness = 1,
+                    LineStyle = LineStyle.Dot
+                };
+                foreach (var point in BaselinePoints)
+                {
+                    baselineSeries.Points.Add(point);
+                }
+                plotModel.Series.Add(baselineSeries);
+                
+                return plotModel;
+            }
+        }
         
         public bool IsTestRunning
         {
@@ -137,10 +262,16 @@ namespace IMUTestApp.ViewModels
         private void ClearProductCode()
         {
             ProductCode = string.Empty;
+            TestData.Clear();
+            PacketCount = 0;
             TestResult = string.Empty;
             TestResultDetails = string.Empty;
-            TestDateTime = string.Empty;
             DataDisplay = "等待输入产品编码...";
+            
+            // 清空图表数据
+            ChartDataPoints.Clear();
+            // 🔥 添加空值检查
+            PlotModel?.InvalidatePlot(true);
         }
         
         private void StartTest()
@@ -154,6 +285,11 @@ namespace IMUTestApp.ViewModels
             TestResultDetails = "测试进行中...";
             
             DataDisplay = $"产品编码: {ProductCode}\n测试开始时间: {_testStartTime:yyyy-MM-dd HH:mm:ss}\n\n";
+            
+            // 清空图表数据
+            ChartDataPoints.Clear();
+            // 🔥 添加空值检查
+            PlotModel?.InvalidatePlot(true);
             
             _timer.Start();
             
@@ -268,23 +404,67 @@ namespace IMUTestApp.ViewModels
             }
         }
         
+        // 🔥 新增：清除图表数据的方法
+        public void ClearChartData()
+        {
+            ChartDataPoints.Clear();
+            OnPropertyChanged(nameof(PlotModel));
+        }
+        
+        // 🔥 新增：重置测试数据的方法
+        private void ResetTestData()
+        {
+            TestData.Clear();
+            ClearChartData();
+            PacketCount = 0;
+            RunTime = "00:00:00";
+            SampleRate = "0 Hz";
+            DataDisplay = "等待输入产品编码...";
+        }
+        
         private void OnDataReceived(object sender, IMUData data)
         {
             if (!IsTestRunning) return;
             
-            TestData.Add(data);
-            PacketCount++;
-            
-            // 更新数据显示
-            DataDisplay += $"[{DateTime.Now:HH:mm:ss.fff}] X:{data.AccelX:F3} Y:{data.AccelY:F3} Z:{data.AccelZ:F3}\n";
-            
-            // 计算采样率
-            if (TestData.Count > 1)
+            // 使用Dispatcher确保在UI线程执行
+            Application.Current.Dispatcher.Invoke(() =>
             {
-                var timeSpan = DateTime.Now - _testStartTime;
-                var rate = PacketCount / timeSpan.TotalSeconds;
-                SampleRate = $"{rate:F1} Hz";
-            }
+                TestData.Add(data);
+                PacketCount++;
+                
+                // 计算相对于基准值的偏差（这里以AccelX为例）
+                double baselineValue = 0.0; // 基准值
+                double deviation = (data.AccelX - baselineValue) * 1000; // 转换为合适的单位
+                
+                // 🔥 添加到 ViewModel 的数据集合中
+                ChartDataPoints.Add(new DataPoint(PacketCount, deviation));
+                
+                // 限制图表数据点数量（保持最近30个点）
+                if (ChartDataPoints.Count > 30)
+                {
+                    ChartDataPoints.RemoveAt(0);
+                    
+                    // 重新调整X轴坐标
+                    for (int i = 0; i < ChartDataPoints.Count; i++)
+                    {
+                        ChartDataPoints[i] = new DataPoint(i + 1, ChartDataPoints[i].Y);
+                    }
+                }
+                
+                // 🔥 通知 PlotModel 属性更新，触发图表重新绘制
+                OnPropertyChanged(nameof(PlotModel));
+                
+                // 更新数据显示
+                DataDisplay += $"[{DateTime.Now:HH:mm:ss.fff}] X:{data.AccelX:F3} Y:{data.AccelY:F3} Z:{data.AccelZ:F3}\n";
+                
+                // 计算采样率
+                if (TestData.Count > 1)
+                {
+                    var timeSpan = DateTime.Now - _testStartTime;
+                    var rate = PacketCount / timeSpan.TotalSeconds;
+                    SampleRate = $"{rate:F1} Hz";
+                }
+            });
         }
         
         private void OnTimerTick(object sender, EventArgs e)

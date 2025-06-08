@@ -14,6 +14,11 @@ namespace IMUTestApp.Models
         private string _dataFileFormat = "csv";
         private bool _enableDataBackup = false;
         private string _backupPath = @"C:\IMUBackup";
+        private string _wheelMotorPort = string.Empty;
+        private string _imuPort = string.Empty;
+        private int _wheelMotorBaudRate = 115200;
+        private int _imuBaudRate = 115200;
+        private bool _autoDetectPorts = true;
         
         public string DataPath
         {
@@ -82,6 +87,36 @@ namespace IMUTestApp.Models
             field = value;
             OnPropertyChanged(propertyName);
             return true;
+        }
+        
+        public string WheelMotorPort
+        {
+            get => _wheelMotorPort;
+            set => SetProperty(ref _wheelMotorPort, value);
+        }
+        
+        public string IMUPort
+        {
+            get => _imuPort;
+            set => SetProperty(ref _imuPort, value);
+        }
+        
+        public int WheelMotorBaudRate
+        {
+            get => _wheelMotorBaudRate;
+            set => SetProperty(ref _wheelMotorBaudRate, value);
+        }
+        
+        public int IMUBaudRate
+        {
+            get => _imuBaudRate;
+            set => SetProperty(ref _imuBaudRate, value);
+        }
+        
+        public bool AutoDetectPorts
+        {
+            get => _autoDetectPorts;
+            set => SetProperty(ref _autoDetectPorts, value);
         }
     }
 }
