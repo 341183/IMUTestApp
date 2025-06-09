@@ -1,3 +1,4 @@
+using System;
 using System.Collections.ObjectModel;
 using System.IO.Ports;
 using System.Linq;
@@ -10,24 +11,23 @@ namespace IMUTestApp.ViewModels
     public class ConfigViewModel : BaseViewModel
     {
         private readonly SerialPortService _serialPortService;
-        private readonly SettingsService _settingsService;
-        private SerialPortConfig _config;
-        private SerialPortConfig _secondConfig;
+        private readonly ConfigService _configService;
+        private SerialPortConfig _config = new SerialPortConfig();
+        private SerialPortConfig _secondConfig = new SerialPortConfig();
+        private string _tcpIpAddress = "192.168.1.1";  // 第一次定义
         private bool _isConnected;
-        private string _tcpIpAddress = "192.168.4.1";
-        private int _tcpPort = 12024;
+        // 删除这行重复定义
+        // private string _tcpIpAddress;  // 重复定义，需要删除
+        private int _tcpPort;
         
-        public ConfigViewModel(SerialPortService serialPortService, SettingsService settingsService)
+        public ConfigViewModel(SerialPortService serialPortService, ConfigService configService)
         {
             _serialPortService = serialPortService;
-            _settingsService = settingsService;
+            _configService = configService;
             _serialPortService.ConnectionStatusChanged += OnConnectionStatusChanged;
             
-            _config = new SerialPortConfig();
-            _secondConfig = new SerialPortConfig { PortName = "COM3", BaudRate = 115200 };
-            
-            // 从设置中加载配置
-            LoadFromSettings();
+            // 从配置文件加载配置
+            LoadFromConfig();
             AvailablePorts = new ObservableCollection<string>();
             BaudRates = new ObservableCollection<int> { 9600, 19200, 38400, 57600, 115200 };
             DataBitsList = new ObservableCollection<int> { 7, 8 };
@@ -56,6 +56,7 @@ namespace IMUTestApp.ViewModels
             {
                 _config.PortName = value;
                 OnPropertyChanged();
+                SaveToConfig();
                 ((RelayCommand)ConnectCommand).RaiseCanExecuteChanged();
             }
         }
@@ -67,6 +68,7 @@ namespace IMUTestApp.ViewModels
             {
                 _config.BaudRate = value;
                 OnPropertyChanged();
+                SaveToConfig();
             }
         }
         
@@ -77,6 +79,7 @@ namespace IMUTestApp.ViewModels
             {
                 _config.DataBits = value;
                 OnPropertyChanged();
+                SaveToConfig();
             }
         }
         
@@ -87,6 +90,7 @@ namespace IMUTestApp.ViewModels
             {
                 _config.StopBits = value;
                 OnPropertyChanged();
+                SaveToConfig();
             }
         }
         
@@ -143,7 +147,7 @@ namespace IMUTestApp.ViewModels
             {
                 _secondConfig.PortName = value;
                 OnPropertyChanged();
-                SaveToSettings();
+                SaveToConfig();
             }
         }
         
@@ -154,7 +158,7 @@ namespace IMUTestApp.ViewModels
             {
                 _secondConfig.BaudRate = value;
                 OnPropertyChanged();
-                SaveToSettings();
+                SaveToConfig();
             }
         }
         
@@ -165,7 +169,7 @@ namespace IMUTestApp.ViewModels
             set
             {
                 SetProperty(ref _tcpIpAddress, value);
-                SaveToSettings();
+                SaveToConfig();
             }
         }
         
@@ -175,27 +179,37 @@ namespace IMUTestApp.ViewModels
             set
             {
                 SetProperty(ref _tcpPort, value);
-                SaveToSettings();
+                SaveToConfig();
             }
         }
         
-        private void LoadFromSettings()
+        private void LoadFromConfig()
         {
-            var settings = _settingsService.Settings;
-            _secondConfig.PortName = settings.SecondSerialPort;
-            _secondConfig.BaudRate = settings.SecondSerialBaudRate;
-            _tcpIpAddress = settings.TcpIpAddress;
-            _tcpPort = settings.TcpPort;
+            var config = _configService.Config;
+            _config = config.SerialPortConfig;
+            _secondConfig = config.SecondSerialPortConfig;
+            _tcpIpAddress = config.TcpConfig.IpAddress;
+            _tcpPort = config.TcpConfig.Port;
+            
+            // 触发属性更新通知
+            OnPropertyChanged(nameof(SelectedPort));
+            OnPropertyChanged(nameof(SelectedBaudRate));
+            OnPropertyChanged(nameof(SelectedDataBits));
+            OnPropertyChanged(nameof(SelectedStopBits));
+            OnPropertyChanged(nameof(SecondSelectedPort));
+            OnPropertyChanged(nameof(SecondSelectedBaudRate));
+            OnPropertyChanged(nameof(TcpIpAddress));
+            OnPropertyChanged(nameof(TcpPort));
         }
         
-        private void SaveToSettings()
+        private void SaveToConfig()
         {
-            var settings = _settingsService.Settings;
-            settings.SecondSerialPort = _secondConfig.PortName;
-            settings.SecondSerialBaudRate = _secondConfig.BaudRate;
-            settings.TcpIpAddress = _tcpIpAddress;
-            settings.TcpPort = _tcpPort;
-            _settingsService.SaveSettings();
+            var config = _configService.Config;
+            config.SerialPortConfig = _config;
+            config.SecondSerialPortConfig = _secondConfig;
+            config.TcpConfig.IpAddress = _tcpIpAddress;
+            config.TcpConfig.Port = _tcpPort;
+            _configService.SaveConfig();
         }
     }
 }

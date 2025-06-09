@@ -1,0 +1,36 @@
+{
+  "SerialPortConfig": {
+    "PortName": "COM1",
+    "BaudRate": 115200,
+    "DataBits": 8,
+    "StopBits": 1,
+    "Parity": "None"
+  },
+  "SecondSerialPortConfig": {
+    "PortName": "COM3",
+    "BaudRate": 115200,
+    "DataBits": 8,
+    "StopBits": 1,
+    "Parity": "None"
+  },
+  "TcpConfig": {
+    "IpAddress": "192.168.4.1",
+    "Port": 12024
+  },
+  "IMUConfig": {
+    "PortName": "",
+    "BaudRate": 115200
+  },
+  "GeneralSettings": {
+    "AutoDetectPorts": true,
+    "DataPath": "Data",
+    "LogPath": "Logs",
+    "EnableLogRotation": true,
+    "LogRotationDays": 7,
+    "MaxLogFileSize": 10,
+    "AutoCreateDirectories": true,
+    "DataFileFormat": "csv",
+    "EnableDataBackup": false,
+    "BackupPath": "Backup"
+  }
+}

@@ -1,25 +1,29 @@
+using System.ComponentModel;
+using System.Runtime.CompilerServices;
 using System.Windows.Input;
 using IMUTestApp.Services;
 using IMUTestApp.Models;
 
 namespace IMUTestApp.ViewModels
 {
-    public class MainViewModel : BaseViewModel
+    public class MainViewModel : INotifyPropertyChanged
     {
         private readonly SerialPortService _serialPortService;
         private readonly SettingsService _settingsService;
+        private readonly ConfigService _configService;
         private string _currentView = "Test";
         private string _deviceStatus = "未连接";
-        private string _dataStatus = "停止";
+        private string _dataStatus = "无数据";
         
         public MainViewModel()
         {
             _serialPortService = new SerialPortService();
             _settingsService = new SettingsService();
+            _configService = new ConfigService();
             _serialPortService.ConnectionStatusChanged += OnConnectionStatusChanged;
             
             TestViewModel = new TestViewModel(_serialPortService);
-            ConfigViewModel = new ConfigViewModel(_serialPortService,_settingsService);
+            ConfigViewModel = new ConfigViewModel(_serialPortService, _configService);
             SettingsViewModel = new SettingsViewModel(_settingsService);
             
             ShowTestViewCommand = new RelayCommand(() => CurrentView = "Test");
@@ -56,6 +60,21 @@ namespace IMUTestApp.ViewModels
         private void OnConnectionStatusChanged(object? sender, bool isConnected)
         {
             DeviceStatus = isConnected ? "已连接" : "未连接";
+        }
+        
+        public event PropertyChangedEventHandler? PropertyChanged;
+        
+        protected virtual void OnPropertyChanged([CallerMemberName] string? propertyName = null)
+        {
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+        }
+        
+        protected bool SetProperty<T>(ref T field, T value, [CallerMemberName] string? propertyName = null)
+        {
+            if (Equals(field, value)) return false;
+            field = value;
+            OnPropertyChanged(propertyName);
+            return true;
         }
     }
 }

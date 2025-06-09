@@ -11,7 +11,11 @@ namespace IMUTestApp.Converters
         
         public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
         {
-            return string.IsNullOrEmpty(value as string) ? Visibility.Collapsed : Visibility.Visible;
+            if (value is string str)
+            {
+                return string.IsNullOrEmpty(str) ? Visibility.Collapsed : Visibility.Visible;
+            }
+            return Visibility.Collapsed; // 返回默认值而不是 null
         }
         
         public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)

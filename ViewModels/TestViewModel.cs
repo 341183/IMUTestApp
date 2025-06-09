@@ -33,7 +33,7 @@ namespace IMUTestApp.ViewModels
         private bool _autoSaveEnabled = true;
 
         // 图表相关属性
-        private PlotModel _plotModel;
+        private PlotModel _plotModel = new PlotModel();
 
         // 🔥 新增：将图表数据作为 ViewModel 属性保存
         public ObservableCollection<DataPoint> ChartDataPoints { get; }
@@ -41,6 +41,8 @@ namespace IMUTestApp.ViewModels
         public ObservableCollection<DataPoint> LowerLimitPoints { get; }
         public ObservableCollection<DataPoint> BaselinePoints { get; }
         
+        // 如果不需要，直接删除这个字段
+        // 或者在构造函数中使用它
         public TestViewModel(SerialPortService serialPortService)
         {
             _serialPortService = serialPortService;
@@ -422,7 +424,7 @@ namespace IMUTestApp.ViewModels
             DataDisplay = "等待输入产品编码...";
         }
         
-        private void OnDataReceived(object sender, IMUData data)
+        private void OnDataReceived(object? sender, IMUData data)
         {
             if (!IsTestRunning) return;
             
@@ -467,7 +469,7 @@ namespace IMUTestApp.ViewModels
             });
         }
         
-        private void OnTimerTick(object sender, EventArgs e)
+        private void OnTimerTick(object? sender, EventArgs e)
         {
             if (IsTestRunning)
             {

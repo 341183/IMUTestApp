@@ -1,19 +1,21 @@
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
+using System.IO;
+using System;
 
 namespace IMUTestApp.Models
 {
     public class AppSettings : INotifyPropertyChanged
     {
-        private string _dataPath = @"C:\IMUData";
-        private string _logPath = @"C:\IMULogs";
+        private string _dataPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Data");
+        private string _logPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Logs");
         private bool _enableLogRotation = true;
         private int _logRotationDays = 7;
         private int _maxLogFileSize = 10; // MB
         private bool _autoCreateDirectories = true;
         private string _dataFileFormat = "csv";
         private bool _enableDataBackup = false;
-        private string _backupPath = @"C:\IMUBackup";
+        private string _backupPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Backup");
         
         // 第一串口设置
         private string _wheelMotorPort = string.Empty;

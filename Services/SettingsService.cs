@@ -53,12 +53,18 @@ namespace IMUTestApp.Services
                     return settings ?? new AppSettings();
                 }
             }
-            catch (Exception ex)
+            catch (Exception)
             {
-                // 可以添加日志记录
-                // 如果加载失败，返回默认设置
+                // 处理异常但不使用异常变量
+                return new AppSettings(); // 直接返回新实例，而不是调用不存在的方法
             }
             
+            return new AppSettings();
+        }
+        
+        // 或者添加 GetDefaultSettings 方法
+        private AppSettings GetDefaultSettings()
+        {
             return new AppSettings();
         }
         
