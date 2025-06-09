@@ -7,24 +7,23 @@
         WindowStartupLocation="CenterScreen">
     
     <Window.Resources>
-        <!-- 优化的内容区域样式 - 移除最大宽度限制 -->
+        <!-- 优化的内容区域样式 -->
         <Style x:Key="ContentAreaStyle" TargetType="UserControl">
             <Setter Property="HorizontalAlignment" Value="Stretch"/>
             <Setter Property="VerticalAlignment" Value="Stretch"/>
             <Setter Property="Margin" Value="10"/>
         </Style>
         
-        <!-- 导航按钮样式 -->
-        <Style x:Key="NavButtonStyle" TargetType="Button">
+        <!-- 工具栏按钮样式 -->
+        <Style x:Key="ToolbarButtonStyle" TargetType="Button">
             <Setter Property="Background" Value="Transparent"/>
             <Setter Property="BorderBrush" Value="#FFCCCCCC"/>
             <Setter Property="BorderThickness" Value="1"/>
-            <Setter Property="Padding" Value="15,10"/>
-            <Setter Property="HorizontalAlignment" Value="Stretch"/>
-            <Setter Property="HorizontalContentAlignment" Value="Left"/>
-            <Setter Property="Margin" Value="5,3"/>
-            <Setter Property="FontSize" Value="14"/>
+            <Setter Property="Padding" Value="12,4"/>
+            <Setter Property="Margin" Value="2,0"/>
+            <Setter Property="FontSize" Value="13"/>
             <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Height" Value="28"/>
             <Style.Triggers>
                 <Trigger Property="IsMouseOver" Value="True">
                     <Setter Property="Background" Value="#FFE3F2FD"/>
@@ -51,114 +50,78 @@
     </Window.Resources>
     
     <Grid>
-        <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="220"/>
-            <ColumnDefinition Width="*"/>
-        </Grid.ColumnDefinitions>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="35"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="25"/>
+        </Grid.RowDefinitions>
         
-        <!-- 左侧导航栏 -->
-        <Border Grid.Column="0" Background="#FFF8F9FA" BorderBrush="#FFDDDDDD" BorderThickness="0,0,1,0">
-            <StackPanel Margin="15">
-                <!-- 程序标题 -->
-                <TextBlock Text="IMU测试程序" 
-                         FontSize="16" 
-                         FontWeight="Bold" 
-                         HorizontalAlignment="Center" 
-                         Margin="0,10,0,20"
-                         TextWrapping="Wrap"/>
-                
-                <!-- 导航按钮 -->
+        <!-- 顶部工具栏 -->
+        <Border Grid.Row="0" Background="#FFF8F9FA" BorderBrush="#FFDDDDDD" BorderThickness="0,0,0,1">
+            <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="10,0">
                 <Button Content="📊 数据测试" 
                         Command="{Binding ShowTestViewCommand}"
-                        Style="{StaticResource NavButtonStyle}"/>
+                        Style="{StaticResource ToolbarButtonStyle}"/>
                 
                 <Button Content="⚙️ 设备配置" 
                         Command="{Binding ShowConfigViewCommand}"
-                        Style="{StaticResource NavButtonStyle}"/>
+                        Style="{StaticResource ToolbarButtonStyle}"/>
                         
                 <Button Content="🔧 系统设置" 
                         Command="{Binding ShowSettingsViewCommand}"
-                        Style="{StaticResource NavButtonStyle}"/>
-                
-                <!-- 状态信息 -->
-                <Border Background="White" 
-                        BorderBrush="#FFDDDDDD" 
-                        BorderThickness="1" 
-                        CornerRadius="5"
-                        Margin="0,30,0,0" 
-                        Padding="12">
-                    <StackPanel>
-                        <TextBlock Text="🔗 连接状态" 
-                                 FontWeight="Bold" 
-                                 FontSize="13"
-                                 Margin="0,0,0,6"/>
-                        <TextBlock Text="{Binding DeviceStatus}" 
-                                 Foreground="#FFDC3545" 
-                                 FontSize="12"
-                                 TextWrapping="Wrap"/>
-                        <TextBlock Text="📡 数据状态" 
-                                 FontWeight="Bold" 
-                                 FontSize="13"
-                                 Margin="0,12,0,6"/>
-                        <TextBlock Text="{Binding DataStatus}" 
-                                 Foreground="Gray" 
-                                 FontSize="12"
-                                 TextWrapping="Wrap"/>
-                    </StackPanel>
-                </Border>
+                        Style="{StaticResource ToolbarButtonStyle}"/>
             </StackPanel>
         </Border>
         
         <!-- 主内容区域 -->
-        <Grid Grid.Column="1" Background="White">
-            <Grid.RowDefinitions>
-                <RowDefinition Height="60"/>
-                <RowDefinition Height="*"/>
-            </Grid.RowDefinitions>
-            
-            <!-- 顶部标题栏 -->
-            <Border Grid.Row="0" Background="#FFF8F9FA" BorderBrush="#FFDDDDDD" BorderThickness="0,0,0,1">
-                <TextBlock x:Name="PageTitleText" 
-                         FontSize="18" 
-                         FontWeight="Bold" 
-                         VerticalAlignment="Center" 
-                         Margin="25,0">
-                    <TextBlock.Style>
-                        <Style TargetType="TextBlock">
-                            <Style.Triggers>
-                                <DataTrigger Binding="{Binding CurrentView}" Value="Test">
-                                    <Setter Property="Text" Value="📊 数据采集与测试"/>
-                                </DataTrigger>
-                                <DataTrigger Binding="{Binding CurrentView}" Value="Config">
-                                    <Setter Property="Text" Value="⚙️ 设备配置管理"/>
-                                </DataTrigger>
-                                <DataTrigger Binding="{Binding CurrentView}" Value="Settings">
-                                    <Setter Property="Text" Value="🔧 系统设置"/>
-                                </DataTrigger>
-                            </Style.Triggers>
-                        </Style>
-                    </TextBlock.Style>
-                </TextBlock>
-            </Border>
-            
-            <!-- 内容显示区域 -->
-            <ContentControl Grid.Row="1" Content="{Binding}">
-                <ContentControl.Style>
-                    <Style TargetType="ContentControl">
-                        <Style.Triggers>
-                            <DataTrigger Binding="{Binding CurrentView}" Value="Test">
-                                <Setter Property="ContentTemplate" Value="{StaticResource TestViewTemplate}"/>
-                            </DataTrigger>
-                            <DataTrigger Binding="{Binding CurrentView}" Value="Config">
-                                <Setter Property="ContentTemplate" Value="{StaticResource ConfigViewTemplate}"/>
-                            </DataTrigger>
-                            <DataTrigger Binding="{Binding CurrentView}" Value="Settings">
-                                <Setter Property="ContentTemplate" Value="{StaticResource SettingsViewTemplate}"/>
-                            </DataTrigger>
-                        </Style.Triggers>
-                    </Style>
-                </ContentControl.Style>
-            </ContentControl>
-        </Grid>
+        <ContentControl Grid.Row="1" Content="{Binding}" Background="White">
+            <ContentControl.Style>
+                <Style TargetType="ContentControl">
+                    <Style.Triggers>
+                        <DataTrigger Binding="{Binding CurrentView}" Value="Test">
+                            <Setter Property="ContentTemplate" Value="{StaticResource TestViewTemplate}"/>
+                        </DataTrigger>
+                        <DataTrigger Binding="{Binding CurrentView}" Value="Config">
+                            <Setter Property="ContentTemplate" Value="{StaticResource ConfigViewTemplate}"/>
+                        </DataTrigger>
+                        <DataTrigger Binding="{Binding CurrentView}" Value="Settings">
+                            <Setter Property="ContentTemplate" Value="{StaticResource SettingsViewTemplate}"/>
+                        </DataTrigger>
+                    </Style.Triggers>
+                </Style>
+            </ContentControl.Style>
+        </ContentControl>
+        
+        <!-- 底部状态栏 -->
+        <Border Grid.Row="2" Background="#FFF8F9FA" BorderBrush="#FFDDDDDD" BorderThickness="0,1,0,0">
+            <Grid Margin="10,0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                
+                <!-- 左侧空白区域，可用于其他状态信息 -->
+                <TextBlock Grid.Column="0" Text="" VerticalAlignment="Center"/>
+                
+                <!-- 连接状态 -->
+                <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,15,0">
+                    <TextBlock Text="🔗" FontSize="11" VerticalAlignment="Center" Margin="0,0,3,0"/>
+                    <TextBlock Text="{Binding DeviceStatus}" 
+                             FontSize="11" 
+                             Foreground="#FFDC3545" 
+                             VerticalAlignment="Center"/>
+                </StackPanel>
+                
+                <!-- 数据状态 -->
+                <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                    <TextBlock Text="📡" FontSize="11" VerticalAlignment="Center" Margin="0,0,3,0"/>
+                    <TextBlock Text="{Binding DataStatus}" 
+                             FontSize="11" 
+                             Foreground="Gray" 
+                             VerticalAlignment="Center"/>
+                </StackPanel>
+            </Grid>
+        </Border>
     </Grid>
 </Window>

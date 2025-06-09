@@ -7,7 +7,7 @@
         <!-- 测试结果样式 -->
         <Style x:Key="TestResultStyle" TargetType="Border">
             <Setter Property="CornerRadius" Value="8"/>
-            <Setter Property="Padding" Value="20"/>
+            <Setter Property="Padding" Value="25"/>
             <Setter Property="Margin" Value="0,0,0,15"/>
             <Style.Triggers>
                 <DataTrigger Binding="{Binding TestResult}" Value="PASS">
@@ -37,223 +37,168 @@
     </UserControl.Resources>
     
     <Grid>
-        <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="1.5*"/>
-            <ColumnDefinition Width="3*"/>
-        </Grid.ColumnDefinitions>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
         
-        <!-- 左侧控制面板 -->
-        <ScrollViewer Grid.Column="0" VerticalScrollBarVisibility="Auto" Margin="0,0,10,0">
-            <StackPanel>
-                <!-- 产品编码输入区 -->
-                <Border Style="{StaticResource CardStyle}">
-                    <StackPanel>
-                        <TextBlock Text="📦 产品编码" FontWeight="Bold" FontSize="15" Margin="0,0,0,10"/>
-                        <Grid>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*"/>
-                                <ColumnDefinition Width="Auto"/>
-                            </Grid.ColumnDefinitions>
-                            <Grid Grid.Column="0">
-                                <TextBox Text="{Binding ProductCode, UpdateSourceTrigger=PropertyChanged}" 
-                                         FontSize="14" 
-                                         Padding="10" 
-                                         Margin="0,0,10,0"
-                                         VerticalAlignment="Center"/>
-                                <TextBlock Text="请输入或扫描产品编码" 
-                                           FontSize="14" 
-                                           Padding="10" 
-                                           Margin="0,0,10,0"
-                                           VerticalAlignment="Center"
-                                           Foreground="Gray"
-                                           IsHitTestVisible="False">
-                                    <TextBlock.Style>
-                                        <Style TargetType="TextBlock">
-                                            <Setter Property="Visibility" Value="Collapsed"/>
-                                            <Style.Triggers>
-                                                <DataTrigger Binding="{Binding ProductCode}" Value="">
-                                                    <Setter Property="Visibility" Value="Visible"/>
-                                                </DataTrigger>
-                                                <DataTrigger Binding="{Binding ProductCode}" Value="{x:Null}">
-                                                    <Setter Property="Visibility" Value="Visible"/>
-                                                </DataTrigger>
-                                            </Style.Triggers>
-                                        </Style>
-                                    </TextBlock.Style>
-                                </TextBlock>
-                            </Grid>
-                            <Button Grid.Column="1" 
-                                    Content="清除" 
-                                    Command="{Binding ClearProductCodeCommand}"
-                                    Padding="12,8" 
-                                    MinWidth="70"
-                                    Background="#FF6C757D" 
-                                    Foreground="White" 
-                                    BorderThickness="0"
-                                    />
-                        </Grid>
-                        
-                        <!-- 操作提示 -->
-                        <TextBlock Text="💡 提示：编码输入完毕后将自动开始测试" 
-                                   FontSize="12" 
-                                   Foreground="#FF007BFF" 
-                                   Margin="0,10,0,0"
-                                   FontStyle="Italic"/>
-                    </StackPanel>
-                </Border>
+        <!-- 顶部测试结果显示区域 -->
+        <Border Grid.Row="0" Style="{StaticResource TestResultStyle}" Margin="0,0,0,20">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
                 
-                <!-- 自动保存设置 -->
-                <Border Style="{StaticResource CardStyle}">
-                    <StackPanel Orientation="Horizontal">
+                <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                    <TextBlock Text="测试结果" 
+                               FontSize="18" 
+                               FontWeight="Bold" 
+                               Foreground="White" 
+                               Margin="0,0,0,8"/>
+                    <TextBlock FontSize="32" 
+                               FontWeight="Bold" 
+                               Foreground="White">
+                        <TextBlock.Style>
+                            <Style TargetType="TextBlock">
+                                <Setter Property="Text" Value="等待测试"/>
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding TestResult}" Value="PASS">
+                                        <Setter Property="Text" Value="✅ PASS"/>
+                                    </DataTrigger>
+                                    <DataTrigger Binding="{Binding TestResult}" Value="NG">
+                                        <Setter Property="Text" Value="❌ NG"/>
+                                    </DataTrigger>
+                                    <DataTrigger Binding="{Binding IsTestRunning}" Value="True">
+                                        <Setter Property="Text" Value="⏳ 测试中..."/>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </TextBlock.Style>
+                    </TextBlock>
+                </StackPanel>
+                
+                <StackPanel Grid.Column="1" VerticalAlignment="Center" HorizontalAlignment="Right">
+                    <TextBlock Text="{Binding TestResultDetails}" 
+                               FontSize="14" 
+                               Foreground="White" 
+                               TextAlignment="Right"
+                               TextWrapping="Wrap"
+                               MaxWidth="200"/>
+                </StackPanel>
+            </Grid>
+        </Border>
+        
+        <!-- 产品编码输入区 -->
+        <Border Grid.Row="1" Style="{StaticResource CardStyle}" Margin="0,5,0,5">
+            <StackPanel>
+                <TextBlock Text="📦 产品编码" FontWeight="Bold" FontSize="15" Margin="0,0,0,8"/>
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <Grid Grid.Column="0">
+                        <TextBox Text="{Binding ProductCode, UpdateSourceTrigger=PropertyChanged}" 
+                                 FontSize="14" 
+                                 Padding="10" 
+                                 Margin="0,0,10,0"
+                                 VerticalAlignment="Center"/>
+                        <TextBlock Text="请输入或扫描产品编码" 
+                                   FontSize="14" 
+                                   Padding="10" 
+                                   Margin="0,0,10,0"
+                                   VerticalAlignment="Center"
+                                   Foreground="Gray"
+                                   IsHitTestVisible="False">
+                            <TextBlock.Style>
+                                <Style TargetType="TextBlock">
+                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding ProductCode}" Value="">
+                                            <Setter Property="Visibility" Value="Visible"/>
+                                        </DataTrigger>
+                                        <DataTrigger Binding="{Binding ProductCode}" Value="{x:Null}">
+                                            <Setter Property="Visibility" Value="Visible"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </TextBlock.Style>
+                        </TextBlock>
+                    </Grid>
+                    
+                    <!-- 自动保存设置 - 移动到产品编码右边 -->
+                    <StackPanel Grid.Column="1" VerticalAlignment="Center" Orientation="Horizontal" Margin="10,0,10,0">
                         <CheckBox IsChecked="{Binding AutoSaveEnabled}" 
                                   VerticalAlignment="Center" 
-                                  Margin="0,0,10,0"/>
-                        <StackPanel>
-                            <TextBlock Text="💾 自动保存测试数据" 
-                                       FontWeight="Bold" 
-                                       FontSize="14"/>
-                            <TextBlock Text="勾选后测试完成时自动保存数据到文件" 
-                                       FontSize="12" 
-                                       Foreground="Gray" 
-                                       Margin="0,2,0,0"/>
-                        </StackPanel>
+                                  Margin="0,0,8,0"/>
+                        <TextBlock Text="💾 自动保存" 
+                                   FontSize="13" 
+                                   Foreground="#FF333333" 
+                                   VerticalAlignment="Center"/>
                     </StackPanel>
-                </Border>
-                
-                <!-- 测试结果显示区 -->
-                <Border Style="{StaticResource TestResultStyle}">
-                    <Grid>
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="Auto"/>
-                        </Grid.ColumnDefinitions>
-                        
-                        <StackPanel Grid.Column="0" VerticalAlignment="Center">
-                            <TextBlock Text="测试结果" 
-                                       FontSize="16" 
-                                       FontWeight="Bold" 
-                                       Foreground="White" 
-                                       Margin="0,0,0,5"/>
-                            <TextBlock FontSize="28" 
-                                       FontWeight="Bold" 
-                                       Foreground="White">
-                                <TextBlock.Style>
-                                    <Style TargetType="TextBlock">
-                                        <Setter Property="Text" Value="等待测试"/>
-                                        <Style.Triggers>
-                                            <DataTrigger Binding="{Binding TestResult}" Value="PASS">
-                                                <Setter Property="Text" Value="✅ PASS"/>
-                                            </DataTrigger>
-                                            <DataTrigger Binding="{Binding TestResult}" Value="NG">
-                                                <Setter Property="Text" Value="❌ NG"/>
-                                            </DataTrigger>
-                                            <DataTrigger Binding="{Binding IsTestRunning}" Value="True">
-                                                <Setter Property="Text" Value="⏳ 测试中..."/>
-                                            </DataTrigger>
-                                        </Style.Triggers>
-                                    </Style>
-                                </TextBlock.Style>
-                            </TextBlock>
-                        </StackPanel>
-                        
-                        <StackPanel Grid.Column="1" VerticalAlignment="Center" HorizontalAlignment="Right">
-                            <TextBlock Text="{Binding TestResultDetails}" 
-                                       FontSize="13" 
-                                       Foreground="White" 
-                                       TextAlignment="Right"
-                                       TextWrapping="Wrap"
-                                       MaxWidth="180"/>
-                        </StackPanel>
-                    </Grid>
-                </Border>
-                
-                <!-- 实时状态 -->
-                <Border Style="{StaticResource CardStyle}">
-                    <StackPanel>
-                        <TextBlock Text="📊 实时状态" FontWeight="Bold" FontSize="15" Margin="0,0,0,10"/>
-                        <Grid>
-                            <Grid.RowDefinitions>
-                                <RowDefinition Height="Auto"/>
-                                <RowDefinition Height="Auto"/>
-                            </Grid.RowDefinitions>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*"/>
-                                <ColumnDefinition Width="*"/>
-                            </Grid.ColumnDefinitions>
-                            
-                            <StackPanel Grid.Row="0" Grid.Column="0" Margin="0,0,10,8">
-                                <TextBlock Text="采样率" FontSize="12" Foreground="Gray"/>
-                                <TextBlock Text="{Binding SampleRate}" FontWeight="Bold" FontSize="14"/>
-                            </StackPanel>
-                            
-                            <StackPanel Grid.Row="0" Grid.Column="1" Margin="10,0,0,8">
-                                <TextBlock Text="数据包" FontSize="12" Foreground="Gray"/>
-                                <TextBlock Text="{Binding PacketCount}" FontWeight="Bold" FontSize="14"/>
-                            </StackPanel>
-                            
-                            <StackPanel Grid.Row="1" Grid.Column="0" Margin="0,0,10,0">
-                                <TextBlock Text="运行时间" FontSize="12" Foreground="Gray"/>
-                                <TextBlock Text="{Binding RunTime}" FontWeight="Bold" FontSize="14"/>
-                            </StackPanel>
-                            
-                            <StackPanel Grid.Row="1" Grid.Column="1" Margin="10,0,0,0">
-                                <TextBlock Text="状态" FontSize="12" Foreground="Gray"/>
-                                <TextBlock FontWeight="Bold" FontSize="14">
-                                    <TextBlock.Style>
-                                        <Style TargetType="TextBlock">
-                                            <Setter Property="Text" Value="待机"/>
-                                            <Setter Property="Foreground" Value="Gray"/>
-                                            <Style.Triggers>
-                                                <DataTrigger Binding="{Binding IsTestRunning}" Value="True">
-                                                    <Setter Property="Text" Value="测试中"/>
-                                                    <Setter Property="Foreground" Value="#FF007BFF"/>
-                                                </DataTrigger>
-                                                <DataTrigger Binding="{Binding TestResult}" Value="PASS">
-                                                    <Setter Property="Text" Value="测试完成"/>
-                                                    <Setter Property="Foreground" Value="#FF28A745"/>
-                                                </DataTrigger>
-                                                <DataTrigger Binding="{Binding TestResult}" Value="NG">
-                                                    <Setter Property="Text" Value="测试完成"/>
-                                                    <Setter Property="Foreground" Value="#FFDC3545"/>
-                                                </DataTrigger>
-                                            </Style.Triggers>
-                                        </Style>
-                                    </TextBlock.Style>
-                                </TextBlock>
-                            </StackPanel>
-                        </Grid>
-                    </StackPanel>
-                </Border>
-            </StackPanel>
-        </ScrollViewer>
-        
-        <!-- 右侧数据展示区 -->
-        <Grid Grid.Column="1" Margin="10,0,0,0">
-            <Grid.RowDefinitions>
-                <RowDefinition Height="3*"/>
-                <RowDefinition Height="2*"/>
-            </Grid.RowDefinitions>
-            
-            <!-- IMU数据偏差图表区域 - 扩大显示 -->
-            <Border Grid.Row="0" BorderBrush="#FFDDDDDD" BorderThickness="1" CornerRadius="6" Margin="0,0,0,10">
-                <Grid>
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="*"/>
-                    </Grid.RowDefinitions>
                     
-                    <!-- 图表标题 -->
-                    <Border Grid.Row="0" Background="#FFF8F9FA" CornerRadius="6,6,0,0" Padding="15,12">
-                        <TextBlock Text="📈 传感器数据图表" FontWeight="Bold" FontSize="15"/>
-                    </Border>
-                    
-                    <!-- OxyPlot图表控件 - 完整显示 -->
-                    <oxy:PlotView Grid.Row="1" Model="{Binding PlotModel}" Background="White" Margin="5"/>
+                    <Button Grid.Column="2" 
+                            Content="清除" 
+                            Command="{Binding ClearProductCodeCommand}"
+                            Padding="12,8" 
+                            MinWidth="70"
+                            Background="#FF6C757D" 
+                            Foreground="White" 
+                            BorderThickness="0"/>
                 </Grid>
-            </Border>
+                
+                <!-- 操作提示 -->
+                <TextBlock Text="💡 提示：编码输入完毕后将自动开始测试" 
+                           FontSize="12" 
+                           Foreground="#FF007BFF" 
+                           Margin="0,8,0,0"
+                           FontStyle="Italic"/>
+            </StackPanel>
+        </Border>
+        
+        <!-- 分割线 -->
+        <!-- 可调整大小的分割线 -->
+        <GridSplitter Grid.Row="2" 
+                      Height="8" 
+                      HorizontalAlignment="Stretch" 
+                      VerticalAlignment="Center"
+                      Background="#FFE0E0E0" 
+                      BorderBrush="#FFCCCCCC" 
+                      BorderThickness="0,1,0,1"
+                      ShowsPreview="True"
+                      ResizeDirection="Rows"
+                      Margin="0,5,0,5">
+            <GridSplitter.Template>
+                <ControlTemplate TargetType="GridSplitter">
+                    <Border Background="{TemplateBinding Background}" 
+                            BorderBrush="{TemplateBinding BorderBrush}" 
+                            BorderThickness="{TemplateBinding BorderThickness}">
+                        <StackPanel Orientation="Horizontal" 
+                                    HorizontalAlignment="Center" 
+                                    VerticalAlignment="Center">
+                            <Rectangle Width="20" Height="2" Fill="#FF999999" Margin="1,0" RadiusX="1" RadiusY="1"/>
+                            <Rectangle Width="20" Height="2" Fill="#FF999999" Margin="1,0" RadiusX="1" RadiusY="1"/>
+                            <Rectangle Width="20" Height="2" Fill="#FF999999" Margin="1,0" RadiusX="1" RadiusY="1"/>
+                        </StackPanel>
+                    </Border>
+                </ControlTemplate>
+            </GridSplitter.Template>
+        </GridSplitter>
+        
+        <!-- 主要内容区域 -->
+        <Grid Grid.Row="3" Margin="0,0,0,0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="3*" MinWidth="200"/>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="2*" MinWidth="200"/>
+            </Grid.ColumnDefinitions>
             
-            <!-- 数据显示区 -->
-            <Border Grid.Row="1" BorderBrush="#FFDDDDDD" BorderThickness="1" CornerRadius="6">
+            <!-- 左侧实时数据区 -->
+            <Border Grid.Column="0" BorderBrush="#FFDDDDDD" BorderThickness="1" CornerRadius="6" Margin="0,0,5,0">
                 <Grid>
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
@@ -266,16 +211,75 @@
                     </Border>
                     
                     <!-- 数据内容 -->
-                    <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto">
-                        <TextBox Text="{Binding DataDisplay, Mode=OneWay}" 
-                               IsReadOnly="True" 
-                               Background="White" 
-                               BorderThickness="0" 
-                               FontFamily="Consolas" 
-                               FontSize="11" 
-                               Padding="15"
-                               TextWrapping="NoWrap"/>
-                    </ScrollViewer>
+                    <TextBox Grid.Row="1" 
+                             Text="{Binding DataDisplay, Mode=OneWay}" 
+                             IsReadOnly="True" 
+                             Background="White" 
+                             BorderThickness="0" 
+                             FontFamily="Consolas" 
+                             FontSize="12" 
+                             Padding="15"
+                             TextWrapping="Wrap"
+                             VerticalScrollBarVisibility="Auto"
+                             HorizontalScrollBarVisibility="Auto"
+                             AcceptsReturn="True"
+                             VerticalAlignment="Stretch"
+                             HorizontalAlignment="Stretch"/>
+                </Grid>
+            </Border>
+            
+            <!-- 可拖拽的分隔线 -->
+            <GridSplitter Grid.Column="1" 
+                          Width="5" 
+                          HorizontalAlignment="Center" 
+                          VerticalAlignment="Stretch" 
+                          Background="#FFF0F0F0" 
+                          BorderBrush="#FFD0D0D0" 
+                          BorderThickness="0.5,0" 
+                          ResizeBehavior="PreviousAndNext" 
+                          ResizeDirection="Columns"
+                          ShowsPreview="True"
+                          Cursor="SizeWE">
+                <GridSplitter.Template>
+                    <ControlTemplate TargetType="GridSplitter">
+                        <Border Background="{TemplateBinding Background}" 
+                                BorderBrush="{TemplateBinding BorderBrush}" 
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="1">
+                            <Grid>
+                                <Rectangle Width="1" 
+                                          Height="20" 
+                                          Fill="#FFBBBBBB" 
+                                          HorizontalAlignment="Center" 
+                                          VerticalAlignment="Center" 
+                                          Margin="-0.5,0,0,0"/>
+                                <Rectangle Width="1" 
+                                          Height="20" 
+                                          Fill="#FFBBBBBB" 
+                                          HorizontalAlignment="Center" 
+                                          VerticalAlignment="Center" 
+                                          Margin="1,0,0,0"/>
+                            </Grid>
+                        </Border>
+                    </ControlTemplate>
+                </GridSplitter.Template>
+            </GridSplitter>
+            
+            <!-- 右侧图表区域 -->
+            <Border Grid.Column="2" BorderBrush="#FFDDDDDD" BorderThickness="1" CornerRadius="6" Margin="5,0,0,0">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+                    
+                    <!-- 图表标题 -->
+                    <Border Grid.Row="0" Background="#FFF8F9FA" CornerRadius="6,6,0,0" Padding="15,12">
+                        <TextBlock Text="📈 传感器数据图表" FontWeight="Bold" FontSize="15"/>
+                    </Border>
+                    
+                    <!-- OxyPlot图表控件 -->
+                    <oxy:PlotView Grid.Row="1" Model="{Binding PlotModel}" Background="White" Margin="5"/>
                 </Grid>
             </Border>
         </Grid>

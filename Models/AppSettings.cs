@@ -14,9 +14,20 @@ namespace IMUTestApp.Models
         private string _dataFileFormat = "csv";
         private bool _enableDataBackup = false;
         private string _backupPath = @"C:\IMUBackup";
+        
+        // 第一串口设置
         private string _wheelMotorPort = string.Empty;
-        private string _imuPort = string.Empty;
         private int _wheelMotorBaudRate = 115200;
+        
+        // 第二串口设置
+        private string _secondSerialPort = "COM3";
+        private int _secondSerialBaudRate = 115200;
+        
+        // TCP设置
+        private string _tcpIpAddress = "192.168.4.1";
+        private int _tcpPort = 12024;
+        
+        private string _imuPort = string.Empty;
         private int _imuBaudRate = 115200;
         private bool _autoDetectPorts = true;
         
@@ -89,22 +100,49 @@ namespace IMUTestApp.Models
             return true;
         }
         
+        // 第一串口属性
         public string WheelMotorPort
         {
             get => _wheelMotorPort;
             set => SetProperty(ref _wheelMotorPort, value);
         }
         
-        public string IMUPort
-        {
-            get => _imuPort;
-            set => SetProperty(ref _imuPort, value);
-        }
-        
         public int WheelMotorBaudRate
         {
             get => _wheelMotorBaudRate;
             set => SetProperty(ref _wheelMotorBaudRate, value);
+        }
+        
+        // 第二串口属性
+        public string SecondSerialPort
+        {
+            get => _secondSerialPort;
+            set => SetProperty(ref _secondSerialPort, value);
+        }
+        
+        public int SecondSerialBaudRate
+        {
+            get => _secondSerialBaudRate;
+            set => SetProperty(ref _secondSerialBaudRate, value);
+        }
+        
+        // TCP设置属性
+        public string TcpIpAddress
+        {
+            get => _tcpIpAddress;
+            set => SetProperty(ref _tcpIpAddress, value);
+        }
+        
+        public int TcpPort
+        {
+            get => _tcpPort;
+            set => SetProperty(ref _tcpPort, value);
+        }
+        
+        public string IMUPort
+        {
+            get => _imuPort;
+            set => SetProperty(ref _imuPort, value);
         }
         
         public int IMUBaudRate

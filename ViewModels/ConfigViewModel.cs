@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.IO.Ports;
 using System.Linq;
 using System.Windows.Input;
 using IMUTestApp.Models;
@@ -9,15 +10,24 @@ namespace IMUTestApp.ViewModels
     public class ConfigViewModel : BaseViewModel
     {
         private readonly SerialPortService _serialPortService;
+        private readonly SettingsService _settingsService;
         private SerialPortConfig _config;
+        private SerialPortConfig _secondConfig;
         private bool _isConnected;
+        private string _tcpIpAddress = "192.168.4.1";
+        private int _tcpPort = 12024;
         
-        public ConfigViewModel(SerialPortService serialPortService)
+        public ConfigViewModel(SerialPortService serialPortService, SettingsService settingsService)
         {
             _serialPortService = serialPortService;
+            _settingsService = settingsService;
             _serialPortService.ConnectionStatusChanged += OnConnectionStatusChanged;
             
             _config = new SerialPortConfig();
+            _secondConfig = new SerialPortConfig { PortName = "COM3", BaudRate = 115200 };
+            
+            // 从设置中加载配置
+            LoadFromSettings();
             AvailablePorts = new ObservableCollection<string>();
             BaudRates = new ObservableCollection<int> { 9600, 19200, 38400, 57600, 115200 };
             DataBitsList = new ObservableCollection<int> { 7, 8 };
@@ -123,6 +133,69 @@ namespace IMUTestApp.ViewModels
         private void OnConnectionStatusChanged(object? sender, bool isConnected)
         {
             IsConnected = isConnected;
+        }
+        
+        // 第二串口属性
+        public string SecondSelectedPort
+        {
+            get => _secondConfig.PortName;
+            set
+            {
+                _secondConfig.PortName = value;
+                OnPropertyChanged();
+                SaveToSettings();
+            }
+        }
+        
+        public int SecondSelectedBaudRate
+        {
+            get => _secondConfig.BaudRate;
+            set
+            {
+                _secondConfig.BaudRate = value;
+                OnPropertyChanged();
+                SaveToSettings();
+            }
+        }
+        
+        // TCP属性
+        public string TcpIpAddress
+        {
+            get => _tcpIpAddress;
+            set
+            {
+                SetProperty(ref _tcpIpAddress, value);
+                SaveToSettings();
+            }
+        }
+        
+        public int TcpPort
+        {
+            get => _tcpPort;
+            set
+            {
+                SetProperty(ref _tcpPort, value);
+                SaveToSettings();
+            }
+        }
+        
+        private void LoadFromSettings()
+        {
+            var settings = _settingsService.Settings;
+            _secondConfig.PortName = settings.SecondSerialPort;
+            _secondConfig.BaudRate = settings.SecondSerialBaudRate;
+            _tcpIpAddress = settings.TcpIpAddress;
+            _tcpPort = settings.TcpPort;
+        }
+        
+        private void SaveToSettings()
+        {
+            var settings = _settingsService.Settings;
+            settings.SecondSerialPort = _secondConfig.PortName;
+            settings.SecondSerialBaudRate = _secondConfig.BaudRate;
+            settings.TcpIpAddress = _tcpIpAddress;
+            settings.TcpPort = _tcpPort;
+            _settingsService.SaveSettings();
         }
     }
 }

@@ -19,7 +19,7 @@ namespace IMUTestApp.ViewModels
             _serialPortService.ConnectionStatusChanged += OnConnectionStatusChanged;
             
             TestViewModel = new TestViewModel(_serialPortService);
-            ConfigViewModel = new ConfigViewModel(_serialPortService);
+            ConfigViewModel = new ConfigViewModel(_serialPortService,_settingsService);
             SettingsViewModel = new SettingsViewModel(_settingsService);
             
             ShowTestViewCommand = new RelayCommand(() => CurrentView = "Test");
