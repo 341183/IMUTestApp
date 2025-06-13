@@ -8,10 +8,5 @@ namespace IMUTestApp.Views
         {
             InitializeComponent();
         }
-
-        private void TextBox_TextChanged()
-        {
-
-        }
     }
 }

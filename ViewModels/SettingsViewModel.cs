@@ -10,12 +10,14 @@ namespace IMUTestApp.ViewModels
     public class SettingsViewModel : BaseViewModel
     {
         private readonly SettingsService _settingsService;
+        private readonly ConfigService _configService; // 添加ConfigService
         private string _statusMessage = "";
         private bool _hasUnsavedChanges = false;
         
-        public SettingsViewModel(SettingsService settingsService)
+        public SettingsViewModel(SettingsService settingsService, ConfigService configService)
         {
             _settingsService = settingsService;
+            _configService = configService; // 注入ConfigService
             Settings = _settingsService.Settings;
             
             // 监听设置变化
@@ -102,7 +104,12 @@ namespace IMUTestApp.ViewModels
         {
             try
             {
+                // 保存用户设置
                 _settingsService.SaveSettings();
+                
+                // 同步更新config.json中的相关配置
+                SyncToConfig();
+                
                 HasUnsavedChanges = false;
                 StatusMessage = "设置已保存";
                 
@@ -115,11 +122,37 @@ namespace IMUTestApp.ViewModels
             }
         }
         
+        private void SyncToConfig()
+        {
+            try
+            {
+                // 将用户设置同步到config.json
+                _configService.Config.GeneralSettings.LogPath = Settings.LogPath;
+                _configService.Config.GeneralSettings.DataPath = Settings.DataPath;
+                _configService.Config.GeneralSettings.EnableLogRotation = Settings.EnableLogRotation;
+                _configService.Config.GeneralSettings.LogRotationDays = Settings.LogRotationDays;
+                _configService.Config.GeneralSettings.MaxLogFileSize = Settings.MaxLogFileSize;
+                _configService.Config.GeneralSettings.AutoCreateDirectories = Settings.AutoCreateDirectories;
+                _configService.Config.GeneralSettings.DataFileFormat = Settings.DataFileFormat;
+                
+                // 保存config.json
+                _configService.SaveConfig();
+            }
+            catch (Exception ex)
+            {
+                throw new Exception($"同步配置文件失败: {ex.Message}");
+            }
+        }
+        
         private void ResetSettings()
         {
             try
             {
                 _settingsService.ResetToDefaults();
+                
+                // 同步重置config.json
+                SyncToConfig();
+                
                 HasUnsavedChanges = false;
                 StatusMessage = "设置已重置为默认值";
                 

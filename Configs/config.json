@@ -31,6 +31,17 @@
     "AutoCreateDirectories": true,
     "DataFileFormat": "csv",
     "EnableDataBackup": false,
-    "BackupPath": "Backup"
+    "BackupPath": "Backup",
+    "LogLevel": "Info",
+    "EnableConsoleLog": false,
+    "LogFormat": "[{Level}] {Timestamp} {Category} - {Message}",
+    "LogCategories": {
+      "SerialPort": "Info",
+      "TCP": "Info",
+      "IMUData": "Warn",
+      "FileIO": "Error",
+      "System": "Info",
+      "UserAction": "Info"
+    }
   }
 }

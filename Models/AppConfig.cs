@@ -2,15 +2,15 @@ using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using System.IO;
 using System;
+using System.Collections.Generic;
 
 namespace IMUTestApp.Models
 {
     public class AppConfig : INotifyPropertyChanged
     {
-        public SerialPortConfig SerialPortConfig { get; set; } = new SerialPortConfig();
-        public SerialPortConfig SecondSerialPortConfig { get; set; } = new SerialPortConfig { PortName = "COM3", BaudRate = 115200 };
+        public SerialPortConfig WheelMotorConfig { get; set; } = new();
+        public SerialPortConfig IMUConfig { get; set; } = new();  // 改为SerialPortConfig类型   
         public TcpConfig TcpConfig { get; set; } = new TcpConfig();
-        public IMUConfig IMUConfig { get; set; } = new IMUConfig();
         public GeneralSettings GeneralSettings { get; set; } = new GeneralSettings();
         
         public event PropertyChangedEventHandler? PropertyChanged;
@@ -99,6 +99,18 @@ namespace IMUTestApp.Models
         private string _dataFileFormat = "csv";
         private bool _enableDataBackup = false;
         private string _backupPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Backup");
+        private string _logLevel = "Info";
+        private bool _enableConsoleLog = false;
+        private string _logFormat = "[{Level}] {Timestamp} {Category} - {Message}";
+        private Dictionary<string, string> _logCategories = new Dictionary<string, string>
+        {
+            { "SerialPort", "Info" },
+            { "TCP", "Info" },
+            { "IMUData", "Warn" },
+            { "FileIO", "Error" },
+            { "System", "Info" },
+            { "UserAction", "Info" }
+        };
         
         public bool AutoDetectPorts
         {
@@ -196,6 +208,46 @@ namespace IMUTestApp.Models
             set
             {
                 _backupPath = value;
+                OnPropertyChanged();
+            }
+        }
+        
+        public string LogLevel
+        {
+            get => _logLevel;
+            set
+            {
+                _logLevel = value;
+                OnPropertyChanged();
+            }
+        }
+
+        public bool EnableConsoleLog
+        {
+            get => _enableConsoleLog;
+            set
+            {
+                _enableConsoleLog = value;
+                OnPropertyChanged();
+            }
+        }
+
+        public string LogFormat
+        {
+            get => _logFormat;
+            set
+            {
+                _logFormat = value;
+                OnPropertyChanged();
+            }
+        }
+
+        public Dictionary<string, string> LogCategories
+        {
+            get => _logCategories;
+            set
+            {
+                _logCategories = value;
                 OnPropertyChanged();
             }
         }

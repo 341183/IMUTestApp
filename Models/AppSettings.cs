@@ -18,12 +18,14 @@ namespace IMUTestApp.Models
         private string _backupPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Backup");
         
         // 第一串口设置
+        // 在字段定义区域（约第22行后）添加：
         private string _wheelMotorPort = string.Empty;
         private int _wheelMotorBaudRate = 115200;
         
-        // 第二串口设置
-        private string _secondSerialPort = "COM3";
+        // 添加缺少的第二串口字段
+        private string _secondSerialPort = string.Empty;
         private int _secondSerialBaudRate = 115200;
+        
         
         // TCP设置
         private string _tcpIpAddress = "192.168.4.1";
@@ -120,12 +122,6 @@ namespace IMUTestApp.Models
         {
             get => _secondSerialPort;
             set => SetProperty(ref _secondSerialPort, value);
-        }
-        
-        public int SecondSerialBaudRate
-        {
-            get => _secondSerialBaudRate;
-            set => SetProperty(ref _secondSerialBaudRate, value);
         }
         
         // TCP设置属性

@@ -26,8 +26,7 @@ namespace IMUTestApp.ViewModels
             _configService = configService;
             _serialPortService.ConnectionStatusChanged += OnConnectionStatusChanged;
             
-            // 从配置文件加载配置
-            LoadFromConfig();
+            // 初始化集合
             AvailablePorts = new ObservableCollection<string>();
             BaudRates = new ObservableCollection<int> { 9600, 19200, 38400, 57600, 115200 };
             DataBitsList = new ObservableCollection<int> { 7, 8 };
@@ -35,11 +34,16 @@ namespace IMUTestApp.ViewModels
             SampleFrequencies = new ObservableCollection<string> { "10 Hz", "50 Hz", "100 Hz", "200 Hz" };
             Ranges = new ObservableCollection<string> { "±2g", "±4g", "±8g", "±16g" };
             
+            // 初始化命令
             ConnectCommand = new RelayCommand(Connect, () => !_isConnected && !string.IsNullOrEmpty(_config.PortName));
             DisconnectCommand = new RelayCommand(Disconnect, () => _isConnected);
             RefreshPortsCommand = new RelayCommand(RefreshPorts);
             
-            RefreshPorts();
+            // 从配置文件加载配置（这会调用RefreshPorts）
+            LoadFromConfig();
+            
+            // 自动连接串口
+            AutoConnect();
         }
         
         public ObservableCollection<string> AvailablePorts { get; }
@@ -128,9 +132,52 @@ namespace IMUTestApp.ViewModels
                 AvailablePorts.Add(port);
             }
             
-            if (AvailablePorts.Any() && string.IsNullOrEmpty(SelectedPort))
+            // 改进的串口选择逻辑
+            if (AvailablePorts.Any())
             {
-                SelectedPort = AvailablePorts.First();
+                // 检查配置文件中的串口是否仍然可用
+                if (!string.IsNullOrEmpty(SelectedPort) && AvailablePorts.Contains(SelectedPort))
+                {
+                    // 配置的串口仍然可用，保持当前选择
+                    // 不需要做任何操作，因为绑定会自动保持选择
+                }
+                else
+                {
+                    // 配置的串口不存在或为空，选择第一个可用串口
+                    SelectedPort = AvailablePorts.First();
+                    
+                    // 串口配置更新后，尝试自动连接
+                    if (!_isConnected)
+                    {
+                        AutoConnect();
+                    }
+                }
+                
+                // 对第二串口执行相同的逻辑
+                if (!string.IsNullOrEmpty(SecondSelectedPort) && AvailablePorts.Contains(SecondSelectedPort))
+                {
+                    // 第二串口配置仍然可用
+                }
+                else
+                {
+                    // 为第二串口选择一个不同的可用串口（如果有多个）
+                    var availableForSecond = AvailablePorts.Where(p => p != SelectedPort).ToList();
+                    if (availableForSecond.Any())
+                    {
+                        SecondSelectedPort = availableForSecond.First();
+                    }
+                    else if (AvailablePorts.Count == 1)
+                    {
+                        // 只有一个串口可用，两个配置使用同一个串口
+                        SecondSelectedPort = AvailablePorts.First();
+                    }
+                }
+            }
+            else
+            {
+                // 没有可用串口时，清空选择
+                SelectedPort = string.Empty;
+                SecondSelectedPort = string.Empty;
             }
         }
         
@@ -186,8 +233,8 @@ namespace IMUTestApp.ViewModels
         private void LoadFromConfig()
         {
             var config = _configService.Config;
-            _config = config.SerialPortConfig;
-            _secondConfig = config.SecondSerialPortConfig;
+            _config = config.WheelMotorConfig;
+            _secondConfig = config.IMUConfig;
             _tcpIpAddress = config.TcpConfig.IpAddress;
             _tcpPort = config.TcpConfig.Port;
             
@@ -200,16 +247,37 @@ namespace IMUTestApp.ViewModels
             OnPropertyChanged(nameof(SecondSelectedBaudRate));
             OnPropertyChanged(nameof(TcpIpAddress));
             OnPropertyChanged(nameof(TcpPort));
+            
+            // 加载配置后刷新串口，确保选择有效的串口
+            RefreshPorts();
         }
         
         private void SaveToConfig()
         {
             var config = _configService.Config;
-            config.SerialPortConfig = _config;
-            config.SecondSerialPortConfig = _secondConfig;
+            config.WheelMotorConfig = _config;
+            config.IMUConfig = _secondConfig;
             config.TcpConfig.IpAddress = _tcpIpAddress;
             config.TcpConfig.Port = _tcpPort;
             _configService.SaveConfig();
+        }
+        
+        private void AutoConnect()
+        {
+            // 确保有可用的串口配置
+            if (!string.IsNullOrEmpty(SelectedPort) && AvailablePorts.Contains(SelectedPort))
+            {
+                try
+                {
+                    // 自动连接主串口
+                    Connect();
+                }
+                catch (Exception ex)
+                {
+                    // 可以添加日志记录连接失败的情况
+                    System.Diagnostics.Debug.WriteLine($"自动连接串口失败: {ex.Message}");
+                }
+            }
         }
     }
 }

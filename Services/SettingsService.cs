@@ -9,11 +9,18 @@ namespace IMUTestApp.Services
     {
         private readonly string _settingsFilePath;
         private AppSettings _settings;
+        private LoggingService? _logger;
         
         public SettingsService()
         {
             _settingsFilePath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "IMUTestApp", "settings.json");
             _settings = LoadSettings();
+        }
+        
+        public void SetLogger(LoggingService logger)
+        {
+            _logger = logger;
+            _logger.LogInfo(LogCategory.System, "设置服务已关联日志服务");
         }
         
         public AppSettings Settings => _settings;
@@ -22,10 +29,13 @@ namespace IMUTestApp.Services
         {
             try
             {
+                _logger?.LogInfo(LogCategory.UserOperation, "开始保存用户设置");
+                
                 var directory = Path.GetDirectoryName(_settingsFilePath);
                 if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory))
                 {
                     Directory.CreateDirectory(directory);
+                    _logger?.LogDebug(LogCategory.System, $"创建设置目录: {directory}");
                 }
                 
                 var json = JsonSerializer.Serialize(_settings, new JsonSerializerOptions
@@ -34,10 +44,11 @@ namespace IMUTestApp.Services
                 });
                 
                 File.WriteAllText(_settingsFilePath, json);
+                _logger?.LogInfo(LogCategory.UserOperation, $"用户设置保存成功: {_settingsFilePath}");
             }
             catch (Exception ex)
             {
-                // 可以添加日志记录
+                _logger?.LogError(LogCategory.System, "保存用户设置失败", ex);
                 throw new InvalidOperationException($"保存设置失败: {ex.Message}", ex);
             }
         }
@@ -48,28 +59,30 @@ namespace IMUTestApp.Services
             {
                 if (File.Exists(_settingsFilePath))
                 {
+                    _logger?.LogInfo(LogCategory.System, $"加载用户设置: {_settingsFilePath}");
+                    
                     var json = File.ReadAllText(_settingsFilePath);
                     var settings = JsonSerializer.Deserialize<AppSettings>(json);
+                    
+                    _logger?.LogInfo(LogCategory.System, "用户设置加载成功");
                     return settings ?? new AppSettings();
                 }
+                else
+                {
+                    _logger?.LogInfo(LogCategory.System, $"用户设置文件不存在，使用默认设置: {_settingsFilePath}");
+                }
             }
-            catch (Exception)
+            catch (Exception ex)
             {
-                // 处理异常但不使用异常变量
-                return new AppSettings(); // 直接返回新实例，而不是调用不存在的方法
+                _logger?.LogError(LogCategory.System, "加载用户设置失败，使用默认设置", ex);
             }
             
             return new AppSettings();
         }
         
-        // 或者添加 GetDefaultSettings 方法
-        private AppSettings GetDefaultSettings()
-        {
-            return new AppSettings();
-        }
-        
         public void ResetToDefaults()
         {
+            _logger?.LogInfo(LogCategory.UserOperation, "重置用户设置为默认值");
             _settings = new AppSettings();
             SaveSettings();
         }
@@ -78,6 +91,8 @@ namespace IMUTestApp.Services
         {
             try
             {
+                _logger?.LogDebug(LogCategory.System, "开始验证路径设置");
+                
                 // 验证数据路径
                 if (!string.IsNullOrEmpty(_settings.DataPath))
                 {
@@ -108,10 +123,12 @@ namespace IMUTestApp.Services
                     }
                 }
                 
+                _logger?.LogInfo(LogCategory.System, "路径验证完成");
                 return true;
             }
-            catch
+            catch (Exception ex)
             {
+                _logger?.LogError(LogCategory.System, "路径验证失败", ex);
                 return false;
             }
         }

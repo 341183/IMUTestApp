@@ -102,11 +102,13 @@
                         <ColumnDefinition Width="Auto"/>
                     </Grid.ColumnDefinitions>
                     <Grid Grid.Column="0">
-                        <TextBox Text="{Binding ProductCode, UpdateSourceTrigger=PropertyChanged}" 
+                        <TextBox x:Name="ProductCodeTextBox"
+                                 Text="{Binding ProductCode, UpdateSourceTrigger=PropertyChanged}" 
                                  FontSize="14" 
                                  Padding="10" 
                                  Margin="0,0,10,0"
-                                 VerticalAlignment="Center"/>
+                                 VerticalAlignment="Center"
+                                 KeyDown="ProductCodeTextBox_KeyDown"/>
                         <TextBlock Text="请输入或扫描产品编码" 
                                    FontSize="14" 
                                    Padding="10" 
