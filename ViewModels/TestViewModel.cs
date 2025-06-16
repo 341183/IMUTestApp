@@ -22,6 +22,7 @@ namespace IMUTestApp.ViewModels
     // 在类的顶部添加模板数据字段
     public partial class TestViewModel : BaseViewModel
     {
+        private TaskCompletionSource<string>? _deviceInfoTaskSource = null;
         private readonly RetryConnectionService _retryService;
         //串口连接
         private readonly DualSerialPortService _dualSerialPortService;
@@ -48,7 +49,11 @@ namespace IMUTestApp.ViewModels
 
         private string _testDateTime = string.Empty;
 
-        private bool _autoSaveEnabled = true;                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             
+        private bool _autoSaveEnabled = true;
+        
+        // 添加清理标志
+        private bool _isCleanupInProgress = false;
+        private DispatcherTimer _testTimer;                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             
 
         // 🔥 新增：将图表数据作为 ViewModel 属性保存
         public ObservableCollection<DataPoint> ChartDataPoints { get; }
@@ -303,116 +308,135 @@ namespace IMUTestApp.ViewModels
             // 清空图表数据
             ChartDataPoints.Clear();
             // 🔥 添加空值检查
-            PlotModel?.InvalidatePlot(true);
+            OnPropertyChanged(nameof(PlotModel));
         }
         
         //开始测试
         private async void StartTest()
         {
-            _loggingService.LogInfo(LogCategory.UserAction, $"开始测试 - 产品编码: {ProductCode}");
+            if (IsTestRunning) return;
             
-            TestData.Clear();
-            PacketCount = 0;
             IsTestRunning = true;
             _testStartTime = DateTime.Now;
             TestDateTime = _testStartTime.ToString("yyyy-MM-dd HH:mm:ss");
+            
+            // 重置清理标志
+            _isCleanupInProgress = false;
+            
+            _dualSerialPortService.DisconnectIMUSafely();
+            await _dualSerialPortService.DisconnectWheelMotorSafelyAsync();
+            TestData.Clear();
+            PacketCount = 0;
             TestResult = string.Empty;
             TestResultDetails = "测试进行中...";
-            
-            _loggingService.LogInfo(LogCategory.IMUData, $"测试开始时间: {_testStartTime:yyyy-MM-dd HH:mm:ss}");
-            
-            DataDisplay = $"产品编码: {ProductCode}\n测试开始时间: {_testStartTime:yyyy-MM-dd HH:mm:ss}\n\n";
             
             // 清空图表数据
             ChartDataPoints.Clear();
             PlotModel?.InvalidatePlot(true);
             
-            try
+            // 初始化测试定时器
+            if (_testTimer == null)
             {
-                _loggingService.LogDebug(LogCategory.IMUData, "开始执行测试步骤");
-                
-                // 步骤1：控制波轮电机转速为50%
-                await Step1_ControlMotor();
-                
-                // 步骤2：连接IMU并获取设备信息
-                var deviceInfo = await Step2_GetDeviceInfo();
-                
-                if (deviceInfo != null)
-                {
-                    _loggingService.LogInfo(LogCategory.IMUData, $"获取到设备信息 - AP名称: {deviceInfo.ApName}");
-                    
-                    // 步骤3：连接WiFi热点
-                    await Step3_ConnectWiFi(deviceInfo.ApName);
-                    
-                    // 步骤4：TCP协议测试
-                    await Step4_TcpProtocolTest();
-                }
-                else
-                {
-                    _loggingService.LogWarn(LogCategory.IMUData, "未能获取到设备信息");
-                }
-                
-                // 启动定时器开始收集数据
-                _timer.Start();
-                _loggingService.LogDebug(LogCategory.IMUData, "数据收集定时器已启动");
-                
-                // 设置测试自动停止时间（例如30秒后自动停止）
-                var autoStopTimer = new DispatcherTimer
+                _testTimer = new DispatcherTimer
                 {
                     Interval = TimeSpan.FromSeconds(30)
                 };
-                autoStopTimer.Tick += async (s, e) =>
+                _testTimer.Tick += async (s, e) =>
                 {
-                    autoStopTimer.Stop();
+                    _testTimer.Stop();
                     if (IsTestRunning)
                     {
                         _loggingService.LogInfo(LogCategory.IMUData, "测试达到预设时间，自动停止");
                         await StopTestAsync();
                     }
                 };
-                autoStopTimer.Start();
+            }
+            
+            try
+            {
+                DataDisplay = "开始测试...\n";
+                _loggingService.LogInfo(LogCategory.IMUData, $"开始测试 - 产品编码: {ProductCode}");
+                
+                // Step 1: 控制电机
+                if (!await Step1_ControlMotor())
+                {
+                    await CleanupAfterFailure("电机控制失败");
+                    return;
+                }
+                
+                // Step 2: 获取设备信息
+                var deviceInfo = await Step2_GetDeviceInfo();
+                if (deviceInfo == null)
+                {
+                    await CleanupAfterFailure("获取设备信息失败");
+                    return;
+                }
+                
+                // Step 3: 连接WiFi
+                if (!await Step3_ConnectWiFi(deviceInfo.ApName))
+                {
+                    await CleanupAfterFailure("WiFi连接失败");
+                    return;
+                }
+                
+                // Step 4: TCP协议测试
+                if (!await Step4_TcpProtocolTest())
+                {
+                    await CleanupAfterFailure("TCP测试失败");
+                    return;
+                }
+                
+                // 启动定时器
+                _timer.Start();
+                _testTimer.Start();
             }
             catch (Exception ex)
             {
-                TestResult = "NG";
-                TestResultDetails = $"测试失败: {ex.Message}";
-                DataDisplay += $"\n错误: {ex.Message}";
-                IsTestRunning = false;
+                _loggingService.LogError(LogCategory.IMUData, $"测试过程中发生异常: {ex.Message}");
+                await CleanupAfterFailure($"测试异常: {ex.Message}");
             }
         }
         
         // 步骤1：控制波轮电机
-        private async Task Step1_ControlMotor()
+        private async Task<bool> Step1_ControlMotor()
         {
-            _loggingService.LogDebug(LogCategory.IMUData, "步骤1: 开始启动波轮电机");
-            DataDisplay += "步骤1: 启动波轮电机...\n";
-            
-            bool connected = await _retryService.RetryConnectionAsync(
-            config => _dualSerialPortService.ConnectWheelMotor(config),
-            _configService.WheelMotorPort,
-            "波轮电机串口",
-            maxRetries: 3,
-            timeoutSeconds: 10,
-            progressCallback: message => DataDisplay += $"{message}\n"
-            );
-
-
-            if (connected && _dualSerialPortService?.IsWheelMotorConnected == true)
+            try
             {
-                // 发送电机控制指令
-                await _dualSerialPortService.SendToWheelMotorAsync("fan pwm 50\r\n");
-                _loggingService.LogInfo(LogCategory.IMUData, "已发送电机控制指令: fan pwm 50");
-                DataDisplay += "已发送指令: fan pwm 50\n";
+                _loggingService.LogDebug(LogCategory.IMUData, "步骤1: 开始启动波轮电机");
+                DataDisplay += "步骤1: 启动波轮电机...\n";
                 
-                // 等待电机启动
-                await Task.Delay(2000);
-                _loggingService.LogInfo(LogCategory.IMUData, "波轮电机已启动至50%转速");
-                DataDisplay += "波轮电机已启动至50%转速\n";
+                bool connected = await _retryService.RetryConnectionAsync(
+                config => _dualSerialPortService.ConnectWheelMotor(config),
+                _configService.WheelMotorPort,
+                "波轮电机串口",
+                maxRetries: 3,
+                timeoutSeconds: 10,
+                progressCallback: message => DataDisplay += $"{message}\n"
+                );
+
+                if (connected && _dualSerialPortService?.IsWheelMotorConnected == true)
+                {
+                    // 发送电机控制指令
+                    await _dualSerialPortService.SendToWheelMotorAsync("fan pwm 50\r\n");
+                    _loggingService.LogInfo(LogCategory.IMUData, "已发送电机控制指令: fan pwm 50");
+                    DataDisplay += "已发送指令: fan pwm 50\n";
+                    
+                    // 等待电机启动
+                    await Task.Delay(2000);
+                    _loggingService.LogInfo(LogCategory.IMUData, "波轮电机已启动至50%转速");
+                    DataDisplay += "波轮电机已启动至50%转速\n";
+                    return true;
+                }
+                else
+                {
+                    _loggingService.LogError(LogCategory.IMUData, "波轮电机串口未连接");
+                    return false;
+                }
             }
-            else
+            catch (Exception ex)
             {
-                _loggingService.LogError(LogCategory.IMUData, "波轮电机串口未连接");
-                throw new Exception("波轮电机串口未连接");
+                _loggingService.LogError(LogCategory.IMUData, $"电机控制失败: {ex.Message}");
+                return false;
             }
         }
         
@@ -459,7 +483,7 @@ namespace IMUTestApp.ViewModels
         }
         
         // 步骤3：连接WiFi热点
-        private async Task Step3_ConnectWiFi(string apName)
+        private async Task<bool> Step3_ConnectWiFi(string apName)
         {
             DataDisplay += $"\n步骤3: 连接WiFi热点 {apName}...\n";
             
@@ -484,73 +508,80 @@ namespace IMUTestApp.ViewModels
                 if (connected)
                 {
                     DataDisplay += $"已成功连接到热点: {apName}\n";
+                    return true;
                 }
                 else
                 {
-                    throw new Exception($"经过重试后仍无法连接到WiFi热点: {apName}");
+                    _loggingService.LogError(LogCategory.TCP, $"经过重试后仍无法连接到WiFi热点: {apName}");
+                    return false;
                 }
             }
             catch (Exception ex)
             {
-                throw new Exception($"WiFi连接失败: {ex.Message}");
+                _loggingService.LogError(LogCategory.TCP, $"WiFi连接失败: {ex.Message}");
+                return false;
             }
         }
         
         // 步骤4：TCP协议测试
-        private async Task Step4_TcpProtocolTest()
+        private async Task<bool> Step4_TcpProtocolTest()
         {
             DataDisplay += "\n步骤4: 开始TCP协议测试...\n";
             
             try
             {
-                // 修复第450-470行的代码，将变量名统一：
+                // 获取TCP配置
+                var config = _configService.Config;
+                string ipAddress = config.TcpConfig.IpAddress;
+                int port = config.TcpConfig.Port; 
+                
+                using (var tcpClient = new System.Net.Sockets.TcpClient())
                 {
-                    // 获取TCP配置
-                    var config = _configService.Config;
-                    string ipAddress = config.TcpConfig.IpAddress;
-                    int port = config.TcpConfig.Port; 
+                    await tcpClient.ConnectAsync(ipAddress, port);
+                    DataDisplay += $"TCP连接已建立: {ipAddress}:{port}\n";
                     
-                    using (var tcpClient = new System.Net.Sockets.TcpClient())
+                    var stream = tcpClient.GetStream();
+                    
+                    // 发送空JSON请求获取IMU数据
+                    string request = "{\"IMU\":{}}";
+                    byte[] requestData = System.Text.Encoding.UTF8.GetBytes(request);
+                    await stream.WriteAsync(requestData, 0, requestData.Length);
+                    DataDisplay += $"发送请求: {request}\n";
+                    
+                    // 读取响应
+                    byte[] buffer = new byte[1024];
+                    int bytesRead = await stream.ReadAsync(buffer, 0, buffer.Length);
+                    string response = System.Text.Encoding.UTF8.GetString(buffer, 0, bytesRead);
+                    DataDisplay += $"收到响应: {response}\n";
+                    
+                    // 解析IMU数据
+                    var imuData = ParseIMUResponse(response);
+                    if (imuData != null)
                     {
-                        await tcpClient.ConnectAsync(ipAddress, port); // 使用正确的变量名
-                        DataDisplay += $"TCP连接已建立: {ipAddress}:{port}\n"; // 使用正确的变量名
-                        
-                        var stream = tcpClient.GetStream();
-                        
-                        // 发送空JSON请求获取IMU数据
-                        string request = "{\"IMU\":{}}";
-                        byte[] requestData = System.Text.Encoding.UTF8.GetBytes(request);
-                        await stream.WriteAsync(requestData, 0, requestData.Length);
-                        DataDisplay += $"发送请求: {request}\n";
-                        
-                        // 读取响应
-                        byte[] buffer = new byte[1024];
-                        int bytesRead = await stream.ReadAsync(buffer, 0, buffer.Length);
-                        string response = System.Text.Encoding.UTF8.GetString(buffer, 0, bytesRead);
-                        DataDisplay += $"收到响应: {response}\n";
-                        
-                        // 解析IMU数据
-                        var imuData = ParseIMUResponse(response);
-                        if (imuData != null)
+                        // 检查是否有模板数据
+                        if (!_hasTemplate)
                         {
-                            // 检查是否有模板数据
-                            if (!_hasTemplate)
-                            {
-                                _templateData = imuData;
-                                _hasTemplate = true;
-                                DataDisplay += "已保存第一组数据作为模板\n";
-                            }
-                            
-                            // 开始连续接收IMU数据进行测试
-                            await ContinuousIMUDataCollection(stream);
+                            _templateData = imuData;
+                            _hasTemplate = true;
+                            DataDisplay += "已保存第一组数据作为模板\n";
                         }
+                        
+                        // 开始连续接收IMU数据进行测试
+                        await ContinuousIMUDataCollection(stream);
+                        return true;
+                    }
+                    else
+                    {
+                        _loggingService.LogError(LogCategory.TCP, "无法解析IMU数据");
+                        return false;
                     }
                 }
             }
             catch (Exception ex)
             {
                 DataDisplay += $"TCP连接失败: {ex.Message}\n";
-                TestResult = "NG";
+                _loggingService.LogError(LogCategory.TCP, $"TCP测试失败: {ex.Message}");
+                return false;
             }
         }
         
@@ -713,52 +744,142 @@ namespace IMUTestApp.ViewModels
             }
         }
         
-        // 停止测试时关闭电机
-        private async Task StopTestAsync()
+        // 新增：测试失败后的清理方法
+        private async Task CleanupAfterFailure(string reason)
         {
-            _loggingService.LogInfo(LogCategory.IMUData, "开始停止测试");
-            
-            IsTestRunning = false;
-            _timer.Stop();
+            if (_isCleanupInProgress) return;
+            _isCleanupInProgress = true;
             
             try
             {
-                // 关闭波轮电机
+                _loggingService.LogWarn(LogCategory.IMUData, $"开始清理资源 - 原因: {reason}");
+                
+                // 停止测试
+                IsTestRunning = false;
+                _testTimer?.Stop();
+                _timer?.Stop();
+                
+                // 关闭电机
+                try
+                {
+                    if (_dualSerialPortService?.IsWheelMotorConnected == true)
+                    {
+                        await _dualSerialPortService.SendToWheelMotorAsync("fan pwm 0\r\n");
+                        await Task.Delay(500); // 等待电机停止
+                        _loggingService.LogInfo(LogCategory.SerialPort, "电机已停止");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _loggingService.LogError(LogCategory.SerialPort, $"停止电机失败: {ex.Message}");
+                }
+                
+                // 断开串口连接
+                try
+                {
+                    _dualSerialPortService?.Dispose();
+                    _loggingService.LogInfo(LogCategory.SerialPort, "串口连接已断开");
+                }
+                catch (Exception ex)
+                {
+                    _loggingService.LogError(LogCategory.SerialPort, $"断开串口连接失败: {ex.Message}");
+                }
+                
+                // 更新UI显示
+                DataDisplay += $"\n\n测试失败: {reason}\n清理完成";
+                TestResult = "NG";
+                TestResultDetails = reason;
+                
+                _loggingService.LogInfo(LogCategory.IMUData, "资源清理完成");
+            }
+            catch (Exception ex)
+            {
+                _loggingService.LogError(LogCategory.IMUData, $"清理过程中发生异常: {ex.Message}");
+            }
+            finally
+            {
+                _isCleanupInProgress = false;
+            }
+        }
+        
+        // 改进现有的 StopTestAsync 方法
+        public async Task StopTestAsync()
+        {
+            if (!IsTestRunning && !_isCleanupInProgress) return;
+            
+            _loggingService.LogInfo(LogCategory.IMUData, "手动停止测试");
+            
+            IsTestRunning = false;
+            _testTimer?.Stop();
+            _timer?.Stop();
+            
+            try
+            {
+                // 发送停止电机指令
                 if (_dualSerialPortService?.IsWheelMotorConnected == true)
                 {
                     await _dualSerialPortService.SendToWheelMotorAsync("fan pwm 0\r\n");
+                    await Task.Delay(500);
                     _loggingService.LogInfo(LogCategory.IMUData, "波轮电机已关闭");
                     DataDisplay += "\n波轮电机已关闭\n";
+                }
+                
+                var testDuration = DateTime.Now - _testStartTime;
+                _loggingService.LogInfo(LogCategory.IMUData, $"测试持续时间: {testDuration.TotalSeconds:F1}秒");
+                _loggingService.LogInfo(LogCategory.IMUData, $"测试结果: {TestResult}");
+                
+                EvaluateTestResult();
+                
+                var endTime = DateTime.Now;
+                DataDisplay += $"\n测试结束时间: {endTime:yyyy-MM-dd HH:mm:ss}";
+                DataDisplay += $"\n测试结果: {TestResult}";
+                DataDisplay += $"\n{TestResultDetails}";
+                
+                if (AutoSaveEnabled && TestData.Count > 0)
+                {
+                    SaveData();
                 }
             }
             catch (Exception ex)
             {
-                _loggingService.LogError(LogCategory.IMUData, $"关闭电机时出错: {ex.Message}", ex);
-                DataDisplay += $"\n关闭电机时出错: {ex.Message}\n";
+                _loggingService.LogError(LogCategory.IMUData, $"停止测试时发生异常: {ex.Message}");
             }
-            
-            // 执行测试结果判定逻辑
-            EvaluateTestResult();
-            
-            var endTime = DateTime.Now;
-            var testDuration = endTime - _testStartTime;
-            _loggingService.LogInfo(LogCategory.IMUData, $"测试结束 - 结果: {TestResult}, 测试时长: {testDuration.TotalSeconds:F1}秒, 数据包数量: {PacketCount}");
-            
-            DataDisplay += $"\n测试结束时间: {endTime:yyyy-MM-dd HH:mm:ss}";
-            DataDisplay += $"\n测试结果: {TestResult}";
-            DataDisplay += $"\n{TestResultDetails}";
-            
-            // 如果启用自动保存，则自动保存数据
-            if (AutoSaveEnabled && TestData.Count > 0)
+        }
+        
+        // 新增：程序关闭时的清理方法
+        public async Task CleanupOnApplicationExit()
+        {
+            try
             {
-                _loggingService.LogDebug(LogCategory.FileIO, "开始自动保存测试数据");
-                SaveData();
+                _loggingService?.LogInfo(LogCategory.IMUData, "程序关闭，开始清理资源");
+                
+                // 如果测试正在运行，先停止测试
+                if (IsTestRunning)
+                {
+                    await StopTestAsync();
+                }
+                
+                // 确保电机停止
+                if (_dualSerialPortService?.IsWheelMotorConnected == true)
+                {
+                    await _dualSerialPortService.SendToWheelMotorAsync("fan pwm 0\r\n");
+                    await Task.Delay(1000); // 给电机足够时间停止
+                }
+                
+                // 释放串口资源
+                _dualSerialPortService?.Dispose();
+                
+                _loggingService?.LogInfo(LogCategory.IMUData, "程序关闭清理完成");
+            }
+            catch (Exception ex)
+            {
+                _loggingService?.LogError(LogCategory.IMUData, $"程序关闭清理异常: {ex.Message}");
             }
         }
         
         private void EvaluateTestResult()
         {
-            _loggingService.LogDebug(LogCategory.IMUData, "开始评估测试结果");
+           // _loggingService.LogDebug(LogCategory.IMUData, "开始评估测试结果");
             
             // 示例测试判定逻辑
             bool isPass = true;
@@ -920,91 +1041,44 @@ namespace IMUTestApp.ViewModels
             }
         }
         
-        private string? _pendingDeviceInfoResponse = null;
-        private readonly object _responseLock = new object();
         
-        private async Task<DeviceInfo> WaitForDeviceInfoResponse()
+private async Task<DeviceInfo?> WaitForDeviceInfoResponse()
         {
-            // 订阅轮子电机数据接收事件
-            _dualSerialPortService.WheelMotorDataReceived += OnWheelMotorDataReceived;
-            
             try
             {
-                var timeout = TimeSpan.FromSeconds(10);
-                var startTime = DateTime.Now;
+                _deviceInfoTaskSource = new TaskCompletionSource<string>();
+                _dualSerialPortService.DeviceInfoReceived += OnDeviceInfoReceived;
                 
                 _loggingService?.LogInfo(LogCategory.SerialPort, "等待设备信息响应...");
                 
-                //间隔0.1s解析信息
-                while (DateTime.Now - startTime < timeout)
-                {
-                    string? responseData = null;
-                    
-                    // 线程安全地检查是否收到响应数据
-                    lock (_responseLock)
-                    {
-                        if (!string.IsNullOrEmpty(_pendingDeviceInfoResponse))
-                        {
-                            responseData = _pendingDeviceInfoResponse;
-                            _pendingDeviceInfoResponse = null; // 清空缓存
-                        }
-                    }
-                    
-                    if (!string.IsNullOrEmpty(responseData))
-                    {
-                        try
-                        {
-                            // 解析JSON响应
-                            var deviceInfoResponse = System.Text.Json.JsonSerializer.Deserialize<DeviceInfoResponse>(responseData);
-                            
-                            if (deviceInfoResponse?.Result == 0) // 假设0表示成功
-                            {
-                                _loggingService?.LogInfo(LogCategory.SerialPort, "设备信息获取成功");
-                                return deviceInfoResponse.DevInfo;
-                            }
-                            else
-                            {
-                                _loggingService?.LogError(LogCategory.SerialPort, $"设备信息获取失败，错误码: {deviceInfoResponse?.Result}");
-                            }
-                        }
-                        catch (System.Text.Json.JsonException ex)
-                        {
-                            _loggingService?.LogError(LogCategory.SerialPort, $"JSON解析失败: {ex.Message}, 原始数据: {responseData}");
-                        }
-                    }
-                    
-                    await Task.Delay(100); // 每100ms检查一次
-                }
+                var timeout = TimeSpan.FromSeconds(10);
+                using var cts = new System.Threading.CancellationTokenSource(timeout);
                 
+                var responseData = await _deviceInfoTaskSource.Task.WaitAsync(cts.Token);
+                
+                var deviceInfoResponse = System.Text.Json.JsonSerializer.Deserialize<DeviceInfoResponse>(responseData);
+                return deviceInfoResponse?.Result == 0 ? deviceInfoResponse.DevInfo : null;
+            }
+            catch (OperationCanceledException)
+            {
                 _loggingService?.LogError(LogCategory.SerialPort, "等待设备信息响应超时");
-                return null; // 超时返回null
+                return null;
             }
             finally
             {
-                // 取消订阅事件
-                _dualSerialPortService.WheelMotorDataReceived -= OnWheelMotorDataReceived;
+                _dualSerialPortService.DeviceInfoReceived -= OnDeviceInfoReceived;
+                _deviceInfoTaskSource = null;
             }
         }
 
-        private void OnWheelMotorDataReceived(object? sender, string data)
+
+        private void OnDeviceInfoReceived(object? sender, string data)
         {
-            if (string.IsNullOrEmpty(data)) return;
-            
-            _loggingService?.LogDebug(LogCategory.SerialPort, $"收到轮子电机数据: {data}");
-            
-            // 检查是否是设备信息响应（可以根据JSON结构或特定字段判断）
-            if (data.Contains("DevInfo") || data.Contains("product") || data.Contains("fw_ver"))
-            {
-                lock (_responseLock)
-                {
-                    _pendingDeviceInfoResponse = data;
-                }
-                
-                _loggingService?.LogInfo(LogCategory.SerialPort, "检测到设备信息响应数据");
-            }
+            _loggingService?.LogInfo(LogCategory.SerialPort, "收到设备信息响应");
+            _deviceInfoTaskSource?.TrySetResult(data);
         }
 
-        private async Task<bool> ConnectToWiFiAsync(string ssid, string password)
+        private async Task<bool> ConnectToWiFiAsync(string ssid, string password = null)
         {
             try
             {
@@ -1013,35 +1087,260 @@ namespace IMUTestApp.ViewModels
                 var wifi = new Wifi();
                 var accessPoints = await Task.Run(() => wifi.GetAccessPoints());
                 
+                if (accessPoints == null || !accessPoints.Any())
+                {
+                    _loggingService?.LogError(LogCategory.TCP, "未找到任何WiFi接入点");
+                    return false;
+                }
+                
                 var targetAP = accessPoints.FirstOrDefault(ap => ap.Name == ssid);
                 if (targetAP == null)
                 {
                     _loggingService?.LogError(LogCategory.TCP, $"未找到WiFi网络: {ssid}");
+                    _loggingService?.LogInfo(LogCategory.TCP, $"可用网络: {string.Join(", ", accessPoints.Select(ap => ap.Name))}");
                     return false;
                 }
-        
-                var authRequest = new AuthRequest(targetAP)
-                {
-                    Password = password
-                };
-        
-                bool connected = await Task.Run(() => targetAP.Connect(authRequest));
                 
-                if (connected)
+                _loggingService?.LogInfo(LogCategory.TCP, $"找到目标网络: {targetAP.Name}, 信号强度: {targetAP.SignalStrength}, 是否需要密码: {targetAP.IsSecure}");
+
+                var authRequest = new AuthRequest(targetAP);
+                // 检查是否为开放网络
+                if (!targetAP.IsSecure)
                 {
-                    _loggingService?.LogInfo(LogCategory.TCP, $"成功连接到WiFi: {ssid}");
-                    return true;
+                    // 开放网络，直接连接
+                    bool connected = await Task.Run(() => targetAP.Connect(authRequest));
+                    
+                    if (connected)
+                    {
+                        _loggingService?.LogInfo(LogCategory.TCP, $"成功连接到开放WiFi: {ssid}");
+                        return true;
+                    }
+                    else
+                    {
+                        _loggingService?.LogError(LogCategory.TCP, $"连接开放WiFi失败: {ssid}");
+                        return false;
+                    }
                 }
                 else
                 {
-                    _loggingService?.LogError(LogCategory.TCP, $"连接WiFi失败: {ssid}");
-                    return false;
+                    // 加密网络，需要密码
+                    if (string.IsNullOrEmpty(password))
+                    {
+                        _loggingService?.LogError(LogCategory.TCP, $"WiFi网络 {ssid} 需要密码但未提供");
+                        return false;
+                    }
+                    
+                    
+                    authRequest.Password = password;
+                    
+                    bool connected = await Task.Run(() => targetAP.Connect(authRequest, true));
+                    
+                    if (connected)
+                    {
+                        _loggingService?.LogInfo(LogCategory.TCP, $"成功连接到加密WiFi: {ssid}");
+                        return true;
+                    }
+                    else
+                    {
+                        _loggingService?.LogError(LogCategory.TCP, $"连接加密WiFi失败: {ssid}");
+                        return false;
+                    }
                 }
+            }
+            catch (ArgumentNullException ex)
+            {
+                _loggingService?.LogError(LogCategory.TCP, $"WiFi连接参数异常 (SimpleWifi库问题): {ex.Message}");
+                _loggingService?.LogError(LogCategory.TCP, "尝试使用netsh替代方案");
+                return await ConnectToOpenWiFiUsingNetshAsync(ssid);
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                _loggingService?.LogError(LogCategory.TCP, $"WiFi连接权限不足: {ex.Message}");
+                _loggingService?.LogError(LogCategory.TCP, "请以管理员身份运行程序");
+                return false;
             }
             catch (Exception ex)
             {
                 _loggingService?.LogError(LogCategory.TCP, $"WiFi连接异常: {ex.Message}");
+                _loggingService?.LogError(LogCategory.TCP, $"异常类型: {ex.GetType().Name}");
+                if (ex.InnerException != null)
+                {
+                    _loggingService?.LogError(LogCategory.TCP, $"内部异常: {ex.InnerException.Message}");
+                }
                 return false;
+            }
+        }
+        
+        private async Task<bool> ConnectToOpenWiFiUsingNetshAsync(string ssid)
+        {
+            try
+            {
+                _loggingService?.LogInfo(LogCategory.TCP, $"使用netsh连接开放WiFi: {ssid}");
+                
+                // 转义SSID中的特殊字符
+                var escapedSsid = EscapeXmlString(ssid);
+                
+                // 开放WiFi的配置文件XML
+                var profileXml = $@"<?xml version=""1.0""?>
+<WLANProfile xmlns=""http://www.microsoft.com/networking/WLAN/profile/v1"">
+    <name>{escapedSsid}</name>
+    <SSIDConfig>
+        <SSID>
+            <name>{escapedSsid}</name>
+        </SSID>
+    </SSIDConfig>
+    <connectionType>ESS</connectionType>
+    <connectionMode>auto</connectionMode>
+    <MSM>
+        <security>
+            <authEncryption>
+                <authentication>open</authentication>
+                <encryption>none</encryption>
+                <useOneX>false</useOneX>
+            </authEncryption>
+        </security>
+    </MSM>
+</WLANProfile>";
+                
+                var tempFile = Path.GetTempFileName();
+                _loggingService?.LogInfo(LogCategory.TCP, $"创建临时配置文件: {tempFile}");
+                
+                await File.WriteAllTextAsync(tempFile, profileXml);
+                
+                // 记录XML内容用于调试
+                _loggingService?.LogInfo(LogCategory.TCP, $"WiFi配置文件内容:\n{profileXml}");
+                
+                try
+                {
+                    // 检查WiFi服务状态
+                    var serviceResult = await RunNetshCommandAsync("wlan show profiles");
+                    if (!serviceResult.Success)
+                    {
+                        _loggingService?.LogError(LogCategory.TCP, $"WiFi服务可能未启动: {serviceResult.Output}");
+                        return false;
+                    }
+                    
+                    // 删除可能存在的同名配置文件
+                    var deleteResult = await RunNetshCommandAsync($"wlan delete profile name=\"{escapedSsid}\"");
+                    _loggingService?.LogInfo(LogCategory.TCP, $"删除旧配置文件结果: {deleteResult.Output}");
+                    
+                    // 添加新的配置文件
+                    var addResult = await RunNetshCommandAsync($"wlan add profile filename=\"{tempFile}\"");
+                    _loggingService?.LogInfo(LogCategory.TCP, $"添加配置文件完整输出: {addResult.Output}");
+                    
+                    if (!addResult.Success)
+                    {
+                        _loggingService?.LogError(LogCategory.TCP, $"添加WiFi配置文件失败: {addResult.Output}");
+                        
+                        // 尝试不同的添加方式
+                        var addResult2 = await RunNetshCommandAsync($"wlan add profile filename=\"{tempFile}\" user=all");
+                        if (!addResult2.Success)
+                        {
+                            _loggingService?.LogError(LogCategory.TCP, $"使用user=all参数也失败: {addResult2.Output}");
+                            return false;
+                        }
+                        else
+                        {
+                            _loggingService?.LogInfo(LogCategory.TCP, "使用user=all参数成功添加配置文件");
+                        }
+                    }
+                    
+                    // 连接到网络
+                    var connectResult = await RunNetshCommandAsync($"wlan connect name=\"{escapedSsid}\"");
+                    _loggingService?.LogInfo(LogCategory.TCP, $"连接命令输出: {connectResult.Output}");
+                    
+                    if (connectResult.Success || connectResult.Output.Contains("连接请求已成功完成") || connectResult.Output.Contains("Connection request was completed successfully"))
+                    {
+                        _loggingService?.LogInfo(LogCategory.TCP, $"成功连接到开放WiFi: {ssid}");
+                        
+                        // 等待连接建立
+                        await Task.Delay(3000);
+                        
+                        // 验证连接状态
+                        var statusResult = await RunNetshCommandAsync("wlan show interfaces");
+                        _loggingService?.LogInfo(LogCategory.TCP, $"连接状态: {statusResult.Output}");
+                        
+                        return statusResult.Output.Contains(escapedSsid) || statusResult.Output.Contains("已连接") || statusResult.Output.Contains("connected");
+                    }
+                    else
+                    {
+                        _loggingService?.LogError(LogCategory.TCP, $"连接WiFi失败: {connectResult.Output}");
+                        return false;
+                    }
+                }
+                finally
+                {
+                    if (File.Exists(tempFile))
+                    {
+                        File.Delete(tempFile);
+                        _loggingService?.LogInfo(LogCategory.TCP, "已删除临时配置文件");
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _loggingService?.LogError(LogCategory.TCP, $"netsh开放WiFi连接异常: {ex.Message}");
+                _loggingService?.LogError(LogCategory.TCP, $"异常堆栈: {ex.StackTrace}");
+                return false;
+            }
+        }
+        
+        private string EscapeXmlString(string input)
+        {
+            if (string.IsNullOrEmpty(input))
+                return input;
+                
+            return input
+                .Replace("&", "&amp;")
+                .Replace("<", "&lt;")
+                .Replace(">", "&gt;")
+                .Replace("\"", "&quot;")
+                .Replace("'", "&apos;");
+        }
+        
+        private async Task<(bool Success, string Output)> RunNetshCommandAsync(string arguments)
+        {
+            try
+            {
+                _loggingService?.LogInfo(LogCategory.TCP, $"执行netsh命令: netsh {arguments}");
+                
+                // 创建批处理命令，设置代码页为UTF-8
+                var batchCommand = $"chcp 65001 >nul && netsh {arguments}";
+                
+                var startInfo = new ProcessStartInfo
+                {
+                    FileName = "cmd",
+                    Arguments = $"/c {batchCommand}",
+                    UseShellExecute = false,
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                    CreateNoWindow = true,
+                    StandardOutputEncoding = Encoding.UTF8,
+                    StandardErrorEncoding = Encoding.UTF8
+                };
+                
+                using var process = Process.Start(startInfo);
+                if (process == null)
+                {
+                    return (false, "无法启动cmd进程");
+                }
+                
+                var output = await process.StandardOutput.ReadToEndAsync();
+                var error = await process.StandardError.ReadToEndAsync();
+                await process.WaitForExitAsync();
+                
+                var success = process.ExitCode == 0;
+                var result = success ? output : $"ExitCode: {process.ExitCode}, Output: {output}, Error: {error}";
+                
+                _loggingService?.LogInfo(LogCategory.TCP, $"netsh命令结果 - 成功: {success}, 输出: {result}");
+                
+                return (success, result);
+            }
+            catch (Exception ex)
+            {
+                var errorMsg = $"执行netsh命令异常: {ex.Message}";
+                _loggingService?.LogError(LogCategory.TCP, errorMsg);
+                return (false, errorMsg);
             }
         }
     }

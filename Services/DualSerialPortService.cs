@@ -42,11 +42,16 @@ namespace IMUTestApp.Services
             }
         }
         
+        // 🔥 新增：专门用于设备信息响应的事件
+        public event EventHandler<string>? DeviceInfoReceived;
+        
+        // 连接IMU
         public bool ConnectIMU(SerialPortConfig config)
         {
             try
             {
                 _imuPort = new SerialPort(config.PortName, config.BaudRate);
+                _imuPort.DataReceived += OnIMUPortDataReceived;  // 添加这行
                 _imuPort.Open();
                 _logger.LogInfo(LogCategory.SerialPort, $"IMU串口连接成功: {config.PortName}");
                 return true;
@@ -55,6 +60,34 @@ namespace IMUTestApp.Services
             {
                 _logger.LogError(LogCategory.SerialPort, $"IMU串口连接失败: {ex.Message}");
                 return false;
+            }
+        }
+        
+        // 🔥 新增：处理IMU串口数据接收
+        private void OnIMUPortDataReceived(object sender, SerialDataReceivedEventArgs e)
+        {
+            try
+            {
+                var port = sender as SerialPort;
+                if (port != null && port.IsOpen)
+                {
+                    string data = port.ReadExisting();
+                    if (!string.IsNullOrEmpty(data))
+                    {
+                        _logger.LogDebug(LogCategory.SerialPort, $"IMU串口接收到数据: {data}");
+                        
+                        // 判断是DeviceInfo响应
+                        if (data.Contains("DevInfo") || data.Contains("product") || data.Contains("fw_ver"))
+                        {
+                            DeviceInfoReceived?.Invoke(this, data);
+                        }
+                        // 其他IMU数据可以触发IMUDataReceived事件
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(LogCategory.SerialPort, $"读取IMU数据失败: {ex.Message}");
             }
         }
         
@@ -86,15 +119,77 @@ namespace IMUTestApp.Services
             }
         }
         
+        // 新增：安全关闭轮子电机连接
+        public async Task DisconnectWheelMotorSafelyAsync()
+        {
+            try
+            {
+                if (_wheelMotorPort?.IsOpen == true)
+                {
+                    // 发送停止指令
+                    await SendToWheelMotorAsync("{\"cmd\":\"stop\"}");
+                    await Task.Delay(500); // 等待电机停止
+                    
+                    _wheelMotorPort.Close();
+                    _logger.LogInfo(LogCategory.SerialPort, "轮子电机串口已安全关闭");
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(LogCategory.SerialPort, $"安全关闭轮子电机串口失败: {ex.Message}");
+            }
+        }
+        
+        // 新增：安全关闭IMU连接
+        public void DisconnectIMUSafely()
+        {
+            try
+            {
+                if (_imuPort?.IsOpen == true)
+                {
+                    _imuPort.Close();
+                    _logger.LogInfo(LogCategory.SerialPort, "IMU串口已安全关闭");
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(LogCategory.SerialPort, $"安全关闭IMU串口失败: {ex.Message}");
+            }
+        }
+        
+        // 改进现有的 Dispose 方法
         public void Dispose()
         {
             if (!_disposed)
             {
-                _wheelMotorPort?.Close();
-                _wheelMotorPort?.Dispose();
-                _imuPort?.Close();
-                _imuPort?.Dispose();
-                _disposed = true;
+                try
+                {
+                    // 尝试安全关闭
+                    DisconnectIMUSafely();
+                    
+                    // 对于轮子电机，如果可能的话发送停止指令
+                    if (_wheelMotorPort?.IsOpen == true)
+                    {
+                        try
+                        {
+                            _wheelMotorPort.Write("{\"cmd\":\"stop\"}");
+                            System.Threading.Thread.Sleep(200); // 简单等待
+                        }
+                        catch { /* 忽略发送停止指令的异常 */ }
+                        
+                        _wheelMotorPort.Close();
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger?.LogError(LogCategory.SerialPort, $"Dispose过程中发生异常: {ex.Message}");
+                }
+                finally
+                {
+                    _wheelMotorPort?.Dispose();
+                    _imuPort?.Dispose();
+                    _disposed = true;
+                }
             }
         }
     }

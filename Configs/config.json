@@ -1,12 +1,12 @@
 {
-  "SerialPortConfig": {
+  "WheelMotorConfig": {
     "PortName": "COM1",
     "BaudRate": 115200,
     "DataBits": 8,
     "StopBits": 1,
     "Parity": "None"
   },
-  "SecondSerialPortConfig": {
+  "IMUConfig": {
     "PortName": "COM3",
     "BaudRate": 115200,
     "DataBits": 8,
@@ -17,12 +17,7 @@
     "IpAddress": "192.168.4.1",
     "Port": 12024
   },
-  "IMUConfig": {
-    "PortName": "",
-    "BaudRate": 115200
-  },
   "GeneralSettings": {
-    "AutoDetectPorts": true,
     "DataPath": "Data",
     "LogPath": "Logs",
     "EnableLogRotation": true,
@@ -32,16 +27,17 @@
     "DataFileFormat": "csv",
     "EnableDataBackup": false,
     "BackupPath": "Backup",
-    "LogLevel": "Info",
+    "LogLevel": "Warn",
     "EnableConsoleLog": false,
-    "LogFormat": "[{Level}] {Timestamp} {Category} - {Message}",
     "LogCategories": {
-      "SerialPort": "Info",
-      "TCP": "Info",
-      "IMUData": "Warn",
+      "SerialPort": "Error",
+      "TCP": "Error", 
+      "IMUData": "Info",
       "FileIO": "Error",
-      "System": "Info",
-      "UserAction": "Info"
+      "System": "Warn",
+      "UserAction": "Info",
+      "UserOperation": "Off",
+      "DataProcessing": "Warn"
     }
   }
 }

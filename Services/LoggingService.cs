@@ -12,7 +12,6 @@ namespace IMUTestApp.Services
     public class LoggingService : IDisposable
     {
         private readonly ConfigService _configService;
-        private readonly SettingsService _settingsService;
         private readonly ConcurrentQueue<LogEntry> _logQueue;
         private readonly Timer _flushTimer;
         private readonly SemaphoreSlim _flushSemaphore;
@@ -20,10 +19,9 @@ namespace IMUTestApp.Services
         private bool _disposed = false;
         private string _currentLogFile = string.Empty;
 
-        public LoggingService(ConfigService configService, SettingsService settingsService)
+        public LoggingService(ConfigService configService)
         {
             _configService = configService;
-            _settingsService = settingsService;
             _logQueue = new ConcurrentQueue<LogEntry>();
             _flushSemaphore = new SemaphoreSlim(1, 1);
             
@@ -38,8 +36,8 @@ namespace IMUTestApp.Services
         {
             try
             {
-                // 使用 SettingsService 中的日志路径
-                var logPath = _settingsService.Settings.LogPath;
+                // 使用 ConfigService 中的日志路径
+                var logPath = _configService.Config.GeneralSettings.LogPath;
                 if (!Directory.Exists(logPath))
                 {
                     Directory.CreateDirectory(logPath);
@@ -61,7 +59,7 @@ namespace IMUTestApp.Services
         {
             try
             {
-                var logPath = _settingsService.Settings.LogPath;
+                var logPath = _configService.Config.GeneralSettings.LogPath;
                 var retentionDays = _configService.Config.GeneralSettings.LogRotationDays;
                 var cutoffDate = DateTime.Now.AddDays(-retentionDays);
 
@@ -210,7 +208,7 @@ namespace IMUTestApp.Services
                 if (fileInfo.Length > maxSizeMB * 1024 * 1024)
                 {
                     var timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
-                    var logPath = _settingsService.Settings.LogPath;
+                    var logPath = _configService.Config.GeneralSettings.LogPath;
                     _currentLogFile = Path.Combine(logPath, $"IMUTestApp_{timestamp}.log");
                 }
             }

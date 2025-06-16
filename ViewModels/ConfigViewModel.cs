@@ -1,6 +1,5 @@
 using System;
 using System.Collections.ObjectModel;
-using System.IO.Ports;
 using System.Linq;
 using System.Windows.Input;
 using IMUTestApp.Models;
@@ -10,21 +9,20 @@ namespace IMUTestApp.ViewModels
 {
     public class ConfigViewModel : BaseViewModel
     {
-        private readonly SerialPortService _serialPortService;
         private readonly ConfigService _configService;
-        private SerialPortConfig _config = new SerialPortConfig();
-        private SerialPortConfig _secondConfig = new SerialPortConfig();
-        private string _tcpIpAddress = "192.168.1.1";  // 第一次定义
-        private bool _isConnected;
-        // 删除这行重复定义
-        // private string _tcpIpAddress;  // 重复定义，需要删除
+        private readonly SerialPortService _serialPortService;
+
+        private SerialPortConfig _config;
+        private SerialPortConfig _secondConfig;
+        private string _tcpIpAddress ;  // 第一次定义
+
         private int _tcpPort;
         
-        public ConfigViewModel(SerialPortService serialPortService, ConfigService configService)
+        public ConfigViewModel(ConfigService configService,LoggingService logger)
         {
-            _serialPortService = serialPortService;
             _configService = configService;
-            _serialPortService.ConnectionStatusChanged += OnConnectionStatusChanged;
+
+            _serialPortService = new SerialPortService(logger);
             
             // 初始化集合
             AvailablePorts = new ObservableCollection<string>();
@@ -33,17 +31,10 @@ namespace IMUTestApp.ViewModels
             StopBitsList = new ObservableCollection<int> { 1, 2 };
             SampleFrequencies = new ObservableCollection<string> { "10 Hz", "50 Hz", "100 Hz", "200 Hz" };
             Ranges = new ObservableCollection<string> { "±2g", "±4g", "±8g", "±16g" };
-            
-            // 初始化命令
-            ConnectCommand = new RelayCommand(Connect, () => !_isConnected && !string.IsNullOrEmpty(_config.PortName));
-            DisconnectCommand = new RelayCommand(Disconnect, () => _isConnected);
             RefreshPortsCommand = new RelayCommand(RefreshPorts);
             
             // 从配置文件加载配置（这会调用RefreshPorts）
             LoadFromConfig();
-            
-            // 自动连接串口
-            AutoConnect();
         }
         
         public ObservableCollection<string> AvailablePorts { get; }
@@ -60,8 +51,6 @@ namespace IMUTestApp.ViewModels
             {
                 _config.PortName = value;
                 OnPropertyChanged();
-                SaveToConfig();
-                ((RelayCommand)ConnectCommand).RaiseCanExecuteChanged();
             }
         }
         
@@ -71,8 +60,8 @@ namespace IMUTestApp.ViewModels
             set
             {
                 _config.BaudRate = value;
+
                 OnPropertyChanged();
-                SaveToConfig();
             }
         }
         
@@ -83,7 +72,6 @@ namespace IMUTestApp.ViewModels
             {
                 _config.DataBits = value;
                 OnPropertyChanged();
-                SaveToConfig();
             }
         }
         
@@ -94,34 +82,10 @@ namespace IMUTestApp.ViewModels
             {
                 _config.StopBits = value;
                 OnPropertyChanged();
-                SaveToConfig();
             }
         }
-        
-        public bool IsConnected
-        {
-            get => _isConnected;
-            set
-            {
-                SetProperty(ref _isConnected, value);
-                ((RelayCommand)ConnectCommand).RaiseCanExecuteChanged();
-                ((RelayCommand)DisconnectCommand).RaiseCanExecuteChanged();
-            }
-        }
-        
-        public ICommand ConnectCommand { get; }
-        public ICommand DisconnectCommand { get; }
+
         public ICommand RefreshPortsCommand { get; }
-        
-        private void Connect()
-        {
-            _serialPortService.Connect(_config);
-        }
-        
-        private void Disconnect()
-        {
-            _serialPortService.Disconnect();
-        }
         
         private void RefreshPorts()
         {
@@ -145,12 +109,6 @@ namespace IMUTestApp.ViewModels
                 {
                     // 配置的串口不存在或为空，选择第一个可用串口
                     SelectedPort = AvailablePorts.First();
-                    
-                    // 串口配置更新后，尝试自动连接
-                    if (!_isConnected)
-                    {
-                        AutoConnect();
-                    }
                 }
                 
                 // 对第二串口执行相同的逻辑
@@ -162,7 +120,7 @@ namespace IMUTestApp.ViewModels
                 {
                     // 为第二串口选择一个不同的可用串口（如果有多个）
                     var availableForSecond = AvailablePorts.Where(p => p != SelectedPort).ToList();
-                    if (availableForSecond.Any())
+                    if (availableForSecond.Count > 0)
                     {
                         SecondSelectedPort = availableForSecond.First();
                     }
@@ -181,11 +139,6 @@ namespace IMUTestApp.ViewModels
             }
         }
         
-        private void OnConnectionStatusChanged(object? sender, bool isConnected)
-        {
-            IsConnected = isConnected;
-        }
-        
         // 第二串口属性
         public string SecondSelectedPort
         {
@@ -194,7 +147,6 @@ namespace IMUTestApp.ViewModels
             {
                 _secondConfig.PortName = value;
                 OnPropertyChanged();
-                SaveToConfig();
             }
         }
         
@@ -205,7 +157,6 @@ namespace IMUTestApp.ViewModels
             {
                 _secondConfig.BaudRate = value;
                 OnPropertyChanged();
-                SaveToConfig();
             }
         }
         
@@ -216,7 +167,6 @@ namespace IMUTestApp.ViewModels
             set
             {
                 SetProperty(ref _tcpIpAddress, value);
-                SaveToConfig();
             }
         }
         
@@ -226,7 +176,6 @@ namespace IMUTestApp.ViewModels
             set
             {
                 SetProperty(ref _tcpPort, value);
-                SaveToConfig();
             }
         }
         
@@ -250,34 +199,6 @@ namespace IMUTestApp.ViewModels
             
             // 加载配置后刷新串口，确保选择有效的串口
             RefreshPorts();
-        }
-        
-        private void SaveToConfig()
-        {
-            var config = _configService.Config;
-            config.WheelMotorConfig = _config;
-            config.IMUConfig = _secondConfig;
-            config.TcpConfig.IpAddress = _tcpIpAddress;
-            config.TcpConfig.Port = _tcpPort;
-            _configService.SaveConfig();
-        }
-        
-        private void AutoConnect()
-        {
-            // 确保有可用的串口配置
-            if (!string.IsNullOrEmpty(SelectedPort) && AvailablePorts.Contains(SelectedPort))
-            {
-                try
-                {
-                    // 自动连接主串口
-                    Connect();
-                }
-                catch (Exception ex)
-                {
-                    // 可以添加日志记录连接失败的情况
-                    System.Diagnostics.Debug.WriteLine($"自动连接串口失败: {ex.Message}");
-                }
-            }
         }
     }
 }

@@ -1,20 +1,103 @@
-using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using System.IO;
 using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 
 namespace IMUTestApp.Models
 {
     public class AppConfig : INotifyPropertyChanged
     {
-        public SerialPortConfig WheelMotorConfig { get; set; } = new();
-        public SerialPortConfig IMUConfig { get; set; } = new();  // 改为SerialPortConfig类型   
-        public TcpConfig TcpConfig { get; set; } = new TcpConfig();
-        public GeneralSettings GeneralSettings { get; set; } = new GeneralSettings();
+        private SerialPortConfig _wheelMotorConfig = new();
+        private SerialPortConfig _imuConfig = new();
+        private TcpConfig _tcpConfig = new();
+        private GeneralSettings _generalSettings = new();
+
+        public SerialPortConfig WheelMotorConfig 
+        { 
+            get => _wheelMotorConfig;
+            set
+            {
+                if (_wheelMotorConfig != value)
+                {
+                    if (_wheelMotorConfig != null)
+                        _wheelMotorConfig.PropertyChanged -= OnChildPropertyChanged;
+                    _wheelMotorConfig = value;
+                    if (_wheelMotorConfig != null)
+                        _wheelMotorConfig.PropertyChanged += OnChildPropertyChanged;
+                    OnPropertyChanged();
+                }
+            }
+        }
         
+        public SerialPortConfig IMUConfig 
+        { 
+            get => _imuConfig;
+            set
+            {
+                if (_imuConfig != value)
+                {
+                    if (_imuConfig != null)
+                        _imuConfig.PropertyChanged -= OnChildPropertyChanged;
+                    _imuConfig = value;
+                    if (_imuConfig != null)
+                        _imuConfig.PropertyChanged += OnChildPropertyChanged;
+                    OnPropertyChanged();
+                }
+            }
+        }
+        
+        public TcpConfig TcpConfig 
+        { 
+            get => _tcpConfig;
+            set
+            {
+                if (_tcpConfig != value)
+                {
+                    if (_tcpConfig != null)
+                        _tcpConfig.PropertyChanged -= OnChildPropertyChanged;
+                    _tcpConfig = value;
+                    if (_tcpConfig != null)
+                        _tcpConfig.PropertyChanged += OnChildPropertyChanged;
+                    OnPropertyChanged();
+                }
+            }
+        }
+        
+        public GeneralSettings GeneralSettings 
+        { 
+            get => _generalSettings;
+            set
+            {
+                if (_generalSettings != value)
+                {
+                    if (_generalSettings != null)
+                        _generalSettings.PropertyChanged -= OnChildPropertyChanged;
+                    _generalSettings = value;
+                    if (_generalSettings != null)
+                        _generalSettings.PropertyChanged += OnChildPropertyChanged;
+                    OnPropertyChanged();
+                }
+            }
+        }
+
+        public AppConfig()
+        {
+            // 订阅子对象的属性更改事件
+            _wheelMotorConfig.PropertyChanged += OnChildPropertyChanged;
+            _imuConfig.PropertyChanged += OnChildPropertyChanged;
+            _tcpConfig.PropertyChanged += OnChildPropertyChanged;
+            _generalSettings.PropertyChanged += OnChildPropertyChanged;
+        }
+
+        private void OnChildPropertyChanged(object? sender, PropertyChangedEventArgs e)
+        {
+            // 当子对象属性更改时，触发AppConfig的PropertyChanged事件
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(sender)));
+        }
+
         public event PropertyChangedEventHandler? PropertyChanged;
-        
+
         protected virtual void OnPropertyChanged([CallerMemberName] string? propertyName = null)
         {
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
@@ -31,8 +114,11 @@ namespace IMUTestApp.Models
             get => _ipAddress;
             set
             {
-                _ipAddress = value;
-                OnPropertyChanged();
+                if (_ipAddress != value)
+                {
+                    _ipAddress = value;
+                    OnPropertyChanged();
+                }
             }
         }
         
@@ -41,55 +127,24 @@ namespace IMUTestApp.Models
             get => _port;
             set
             {
-                _port = value;
-                OnPropertyChanged();
+                if (_port != value)
+                {
+                    _port = value;
+                    OnPropertyChanged();
+                }
             }
         }
-        
+
         public event PropertyChangedEventHandler? PropertyChanged;
-        
+
         protected virtual void OnPropertyChanged([CallerMemberName] string? propertyName = null)
         {
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
         }
     }
-    
-    public class IMUConfig : INotifyPropertyChanged
-    {
-        private string _portName = string.Empty;
-        private int _baudRate = 115200;
-        
-        public string PortName
-        {
-            get => _portName;
-            set
-            {
-                _portName = value;
-                OnPropertyChanged();
-            }
-        }
-        
-        public int BaudRate
-        {
-            get => _baudRate;
-            set
-            {
-                _baudRate = value;
-                OnPropertyChanged();
-            }
-        }
-        
-        public event PropertyChangedEventHandler? PropertyChanged;
-        
-        protected virtual void OnPropertyChanged([CallerMemberName] string? propertyName = null)
-        {
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
-        }
-    }
-    
+     
     public class GeneralSettings : INotifyPropertyChanged
     {
-        private bool _autoDetectPorts = true;
         private string _dataPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Data");
         private string _logPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Logs");
         private bool _enableLogRotation = true;
@@ -101,8 +156,7 @@ namespace IMUTestApp.Models
         private string _backupPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Backup");
         private string _logLevel = "Info";
         private bool _enableConsoleLog = false;
-        private string _logFormat = "[{Level}] {Timestamp} {Category} - {Message}";
-        private Dictionary<string, string> _logCategories = new Dictionary<string, string>
+        private Dictionary<string, string> _logCategories = new()
         {
             { "SerialPort", "Info" },
             { "TCP", "Info" },
@@ -111,149 +165,177 @@ namespace IMUTestApp.Models
             { "System", "Info" },
             { "UserAction", "Info" }
         };
-        
-        public bool AutoDetectPorts
-        {
-            get => _autoDetectPorts;
-            set
-            {
-                _autoDetectPorts = value;
-                OnPropertyChanged();
-            }
-        }
-        
+
+        //保存数据路径       
         public string DataPath
         {
             get => _dataPath;
             set
             {
-                _dataPath = value;
-                OnPropertyChanged();
+                if (_dataPath != value)
+                {
+                    _dataPath = value;
+                    OnPropertyChanged();
+                }
             }
         }
         
+        //日志路径
         public string LogPath
         {
             get => _logPath;
             set
             {
-                _logPath = value;
-                OnPropertyChanged();
+                if (_logPath != value)
+                {
+                    _logPath = value;
+                    OnPropertyChanged();
+                }
             }
         }
         
+        //启用日志轮转
         public bool EnableLogRotation
         {
             get => _enableLogRotation;
             set
             {
-                _enableLogRotation = value;
-                OnPropertyChanged();
+                if (_enableLogRotation != value)
+                {
+                    _enableLogRotation = value;
+                    OnPropertyChanged();
+                }
             }
         }
         
+        //日志论转天数
         public int LogRotationDays
         {
             get => _logRotationDays;
             set
             {
-                _logRotationDays = value;
-                OnPropertyChanged();
+                if (_logRotationDays != value)
+                {
+                    _logRotationDays = value;
+                    OnPropertyChanged();
+                }
             }
         }
         
+        //最大文件尺寸
         public int MaxLogFileSize
         {
             get => _maxLogFileSize;
             set
             {
-                _maxLogFileSize = value;
-                OnPropertyChanged();
+                if (_maxLogFileSize != value)
+                {
+                    _maxLogFileSize = value;
+                    OnPropertyChanged();
+                }
             }
         }
         
+        //自动创建文件夹
         public bool AutoCreateDirectories
         {
             get => _autoCreateDirectories;
             set
             {
-                _autoCreateDirectories = value;
-                OnPropertyChanged();
+                if (_autoCreateDirectories != value)
+                {
+                    _autoCreateDirectories = value;
+                    OnPropertyChanged();
+                }
             }
         }
         
+        //数据文件格式
         public string DataFileFormat
         {
             get => _dataFileFormat;
             set
             {
-                _dataFileFormat = value;
-                OnPropertyChanged();
+                if (_dataFileFormat != value)
+                {
+                    _dataFileFormat = value;
+                    OnPropertyChanged();
+                }
             }
         }
         
+        //启用数据备份
         public bool EnableDataBackup
         {
             get => _enableDataBackup;
             set
             {
-                _enableDataBackup = value;
-                OnPropertyChanged();
+                if (_enableDataBackup != value)
+                {
+                    _enableDataBackup = value;
+                    OnPropertyChanged();
+                }
             }
         }
         
+        //备份路径
         public string BackupPath
         {
             get => _backupPath;
             set
             {
-                _backupPath = value;
-                OnPropertyChanged();
+                if (_backupPath != value)
+                {
+                    _backupPath = value;
+                    OnPropertyChanged();
+                }
             }
         }
         
+        //日志等级
         public string LogLevel
         {
             get => _logLevel;
             set
             {
-                _logLevel = value;
-                OnPropertyChanged();
+                if (_logLevel != value)
+                {
+                    _logLevel = value;
+                    OnPropertyChanged();
+                }
             }
         }
 
+        //其余命令行日志
         public bool EnableConsoleLog
         {
             get => _enableConsoleLog;
             set
             {
-                _enableConsoleLog = value;
-                OnPropertyChanged();
+                if (_enableConsoleLog != value)
+                {
+                    _enableConsoleLog = value;
+                    OnPropertyChanged();
+                }
             }
-        }
+        }  
 
-        public string LogFormat
-        {
-            get => _logFormat;
-            set
-            {
-                _logFormat = value;
-                OnPropertyChanged();
-            }
-        }
-
+        //日志类别
         public Dictionary<string, string> LogCategories
         {
             get => _logCategories;
             set
             {
-                _logCategories = value;
-                OnPropertyChanged();
+                if (_logCategories != value)
+                {
+                    _logCategories = value;
+                    OnPropertyChanged();
+                }
             }
         }
-        
+
         public event PropertyChangedEventHandler? PropertyChanged;
-        
+
         protected virtual void OnPropertyChanged([CallerMemberName] string? propertyName = null)
         {
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));

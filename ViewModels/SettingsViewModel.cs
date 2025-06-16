@@ -1,56 +1,153 @@
-using System;
 using System.IO;
 using System.Windows.Input;
 using Microsoft.Win32;
-using IMUTestApp.Models;
 using IMUTestApp.Services;
 
 namespace IMUTestApp.ViewModels
 {
     public class SettingsViewModel : BaseViewModel
     {
-        private readonly SettingsService _settingsService;
-        private readonly ConfigService _configService; // 添加ConfigService
-        private string _statusMessage = "";
+        private readonly ConfigService _configService;
+        private string _statusMessage = string.Empty;
         private bool _hasUnsavedChanges = false;
         
-        public SettingsViewModel(SettingsService settingsService, ConfigService configService)
+        public SettingsViewModel(ConfigService configService)
         {
-            _settingsService = settingsService;
-            _configService = configService; // 注入ConfigService
-            Settings = _settingsService.Settings;
-            
-            // 监听设置变化
-            Settings.PropertyChanged += (s, e) => HasUnsavedChanges = true;
+            _configService = configService;
             
             BrowseDataPathCommand = new RelayCommand(BrowseDataPath);
             BrowseLogPathCommand = new RelayCommand(BrowseLogPath);
             BrowseBackupPathCommand = new RelayCommand(BrowseBackupPath);
             SaveSettingsCommand = new RelayCommand(SaveSettings);
-            ResetSettingsCommand = new RelayCommand(ResetSettings);
             ValidatePathsCommand = new RelayCommand(ValidatePaths);
-        }
-        
-        public AppSettings Settings { get; }
-        
-        public string StatusMessage
-        {
-            get => _statusMessage;
-            set => SetProperty(ref _statusMessage, value);
-        }
-        
-        public bool HasUnsavedChanges
-        {
-            get => _hasUnsavedChanges;
-            set => SetProperty(ref _hasUnsavedChanges, value);
+            ResetSettingsCommand = new RelayCommand(ResetSettings);
         }
         
         public ICommand BrowseDataPathCommand { get; }
         public ICommand BrowseLogPathCommand { get; }
         public ICommand BrowseBackupPathCommand { get; }
         public ICommand SaveSettingsCommand { get; }
-        public ICommand ResetSettingsCommand { get; }
         public ICommand ValidatePathsCommand { get; }
+        public ICommand ResetSettingsCommand { get; }
+
+        public string DataPath
+        {
+            get => _configService.Config.GeneralSettings.DataPath;
+            set
+            {
+                _configService.Config.GeneralSettings.DataPath = value;
+                OnPropertyChanged();
+                HasUnsavedChanges = true;
+            }
+        }
+
+        public string BackupPath
+        {
+            get => _configService.Config.GeneralSettings.BackupPath;
+            set
+            {
+                _configService.Config.GeneralSettings.BackupPath = value;
+                OnPropertyChanged();
+                HasUnsavedChanges = true;
+            }
+        }
+
+        public string LogPath
+        {
+            get => _configService.Config.GeneralSettings.LogPath;
+            set
+            {
+                _configService.Config.GeneralSettings.LogPath = value;
+                OnPropertyChanged();
+                HasUnsavedChanges = true;
+            }
+        }
+
+        public string DataFileFormat
+        {
+            get => _configService.Config.GeneralSettings.DataFileFormat;
+            set
+            {
+                _configService.Config.GeneralSettings.DataFileFormat = value;
+                OnPropertyChanged();
+                HasUnsavedChanges = true;
+            }
+        }
+
+        public bool EnableDataBackup
+        {
+            get => _configService.Config.GeneralSettings.EnableDataBackup;
+            set
+            {
+                _configService.Config.GeneralSettings.EnableDataBackup = value;
+                OnPropertyChanged();
+                HasUnsavedChanges = true;
+            }
+        }
+
+        public bool EnableLogRotation
+        {
+            get => _configService.Config.GeneralSettings.EnableLogRotation;
+            set
+            {
+                _configService.Config.GeneralSettings.EnableLogRotation = value;
+                OnPropertyChanged();
+                HasUnsavedChanges = true;
+            }
+        }
+
+        public int LogRotationDays
+        {
+            get => _configService.Config.GeneralSettings.LogRotationDays;
+            set
+            {
+                _configService.Config.GeneralSettings.LogRotationDays = value;
+                OnPropertyChanged();
+                HasUnsavedChanges = true;
+            }
+        }
+
+        public int MaxLogFileSize
+        {
+            get => _configService.Config.GeneralSettings.MaxLogFileSize;
+            set
+            {
+                _configService.Config.GeneralSettings.MaxLogFileSize = value;
+                OnPropertyChanged();
+                HasUnsavedChanges = true;
+            }
+        }
+
+        public bool AutoCreateDirectories
+        {
+            get => _configService.Config.GeneralSettings.AutoCreateDirectories;
+            set
+            {
+                _configService.Config.GeneralSettings.AutoCreateDirectories = value;
+                OnPropertyChanged();
+                HasUnsavedChanges = true;
+            }
+        }
+
+        public string StatusMessage
+        {
+            get => _statusMessage;
+            set
+            {
+                _statusMessage = value;
+                OnPropertyChanged();
+            }
+        }
+
+        public bool HasUnsavedChanges
+        {
+            get => _hasUnsavedChanges;
+            set
+            {
+                _hasUnsavedChanges = value;
+                OnPropertyChanged();
+            }
+        }
         
         private void BrowseDataPath()
         {
@@ -64,7 +161,7 @@ namespace IMUTestApp.ViewModels
             
             if (dialog.ShowDialog() == true)
             {
-                Settings.DataPath = Path.GetDirectoryName(dialog.FileName) ?? Settings.DataPath;
+                DataPath = Path.GetDirectoryName(dialog.FileName) ?? _configService.Config.GeneralSettings.DataPath;
             }
         }
         
@@ -80,7 +177,7 @@ namespace IMUTestApp.ViewModels
             
             if (dialog.ShowDialog() == true)
             {
-                Settings.LogPath = Path.GetDirectoryName(dialog.FileName) ?? Settings.LogPath;
+                LogPath = Path.GetDirectoryName(dialog.FileName) ?? _configService.Config.GeneralSettings.LogPath;
             }
         }
         
@@ -96,95 +193,65 @@ namespace IMUTestApp.ViewModels
             
             if (dialog.ShowDialog() == true)
             {
-                Settings.BackupPath = Path.GetDirectoryName(dialog.FileName) ?? Settings.BackupPath;
+                BackupPath = Path.GetDirectoryName(dialog.FileName) ?? _configService.Config.GeneralSettings.BackupPath;
             }
         }
-        
+
         private void SaveSettings()
         {
             try
             {
-                // 保存用户设置
-                _settingsService.SaveSettings();
-                
-                // 同步更新config.json中的相关配置
-                SyncToConfig();
-                
+                _configService.SaveConfig();
+                StatusMessage = "设置保存成功！";
                 HasUnsavedChanges = false;
-                StatusMessage = "设置已保存";
                 
                 // 3秒后清除状态消息
-                System.Threading.Tasks.Task.Delay(3000).ContinueWith(_ => StatusMessage = "");
+                System.Threading.Tasks.Task.Delay(3000).ContinueWith(_ => 
+                {
+                    StatusMessage = string.Empty;
+                }, System.Threading.Tasks.TaskScheduler.FromCurrentSynchronizationContext());
             }
-            catch (Exception ex)
+            catch (System.Exception ex)
             {
                 StatusMessage = $"保存失败: {ex.Message}";
             }
         }
-        
-        private void SyncToConfig()
-        {
-            try
-            {
-                // 将用户设置同步到config.json
-                _configService.Config.GeneralSettings.LogPath = Settings.LogPath;
-                _configService.Config.GeneralSettings.DataPath = Settings.DataPath;
-                _configService.Config.GeneralSettings.EnableLogRotation = Settings.EnableLogRotation;
-                _configService.Config.GeneralSettings.LogRotationDays = Settings.LogRotationDays;
-                _configService.Config.GeneralSettings.MaxLogFileSize = Settings.MaxLogFileSize;
-                _configService.Config.GeneralSettings.AutoCreateDirectories = Settings.AutoCreateDirectories;
-                _configService.Config.GeneralSettings.DataFileFormat = Settings.DataFileFormat;
-                
-                // 保存config.json
-                _configService.SaveConfig();
-            }
-            catch (Exception ex)
-            {
-                throw new Exception($"同步配置文件失败: {ex.Message}");
-            }
-        }
-        
-        private void ResetSettings()
-        {
-            try
-            {
-                _settingsService.ResetToDefaults();
-                
-                // 同步重置config.json
-                SyncToConfig();
-                
-                HasUnsavedChanges = false;
-                StatusMessage = "设置已重置为默认值";
-                
-                // 3秒后清除状态消息
-                System.Threading.Tasks.Task.Delay(3000).ContinueWith(_ => StatusMessage = "");
-            }
-            catch (Exception ex)
-            {
-                StatusMessage = $"重置失败: {ex.Message}";
-            }
-        }
-        
+
         private void ValidatePaths()
         {
-            try
+            var invalidPaths = new System.Collections.Generic.List<string>();
+            
+            if (!Directory.Exists(DataPath))
+                invalidPaths.Add("数据路径");
+            if (!Directory.Exists(LogPath))
+                invalidPaths.Add("日志路径");
+            if (EnableDataBackup && !Directory.Exists(BackupPath))
+                invalidPaths.Add("备份路径");
+            
+            if (invalidPaths.Count == 0)
             {
-                if (_settingsService.ValidatePaths())
-                {
-                    StatusMessage = "路径验证成功";
-                }
-                else
-                {
-                    StatusMessage = "路径验证失败，请检查路径设置";
-                }
-                
-                // 3秒后清除状态消息
-                System.Threading.Tasks.Task.Delay(3000).ContinueWith(_ => StatusMessage = "");
+                StatusMessage = "所有路径验证通过！";
             }
-            catch (Exception ex)
+            else
             {
-                StatusMessage = $"验证失败: {ex.Message}";
+                StatusMessage = $"以下路径无效: {string.Join(", ", invalidPaths)}";
             }
+        }
+
+        private void ResetSettings()
+        {
+            var defaultConfig = new Models.GeneralSettings();
+            DataPath = defaultConfig.DataPath;
+            LogPath = defaultConfig.LogPath;
+            BackupPath = defaultConfig.BackupPath;
+            DataFileFormat = defaultConfig.DataFileFormat;
+            EnableDataBackup = defaultConfig.EnableDataBackup;
+            EnableLogRotation = defaultConfig.EnableLogRotation;
+            LogRotationDays = defaultConfig.LogRotationDays;
+            MaxLogFileSize = defaultConfig.MaxLogFileSize;
+            AutoCreateDirectories = defaultConfig.AutoCreateDirectories;
+            
+            StatusMessage = "设置已重置为默认值";
         }
     }
 }

@@ -9,8 +9,9 @@ namespace IMUTestApp.Models
         public LogCategory Category { get; set; }
         public string Message { get; set; } = string.Empty;
         public string? Exception { get; set; }
-        public string? StackTrace { get; set; }
-        public string? AdditionalData { get; set; }
+        // 移除不常用的字段
+        // public string? StackTrace { get; set; }
+        // public string? AdditionalData { get; set; }
 
         public LogEntry()
         {
@@ -27,7 +28,6 @@ namespace IMUTestApp.Models
         public LogEntry(LogLevel level, LogCategory category, string message, Exception ex) : this(level, category, message)
         {
             Exception = ex.Message;
-            StackTrace = ex.StackTrace;
         }
 
         public override string ToString()

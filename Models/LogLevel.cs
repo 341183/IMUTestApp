@@ -18,8 +18,6 @@ namespace IMUTestApp.Models
         IMUData,
         FileIO,
         UserAction,
-        Config,
         UserOperation,    // 新增：用户操作类别
-        DataProcessing    // 新增：数据处理类别
     }
 }
