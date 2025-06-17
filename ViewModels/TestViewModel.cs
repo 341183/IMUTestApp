@@ -29,7 +29,6 @@ namespace IMUTestApp.ViewModels
         //配置文件
         private readonly ConfigService _configService;
         private readonly LoggingService _loggingService; // 添加日志服务
-
         
         // 模板数据相关字段
         private bool _hasTemplate = false;
@@ -52,8 +51,7 @@ namespace IMUTestApp.ViewModels
         private bool _autoSaveEnabled = true;
         
         // 添加清理标志
-        private bool _isCleanupInProgress = false;
-        private DispatcherTimer _testTimer;                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             
+        private bool _isCleanupInProgress = false;                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             
 
         // 🔥 新增：将图表数据作为 ViewModel 属性保存
         public ObservableCollection<DataPoint> ChartDataPoints { get; }
@@ -61,13 +59,21 @@ namespace IMUTestApp.ViewModels
         public ObservableCollection<DataPoint> LowerLimitPoints { get; }
         public ObservableCollection<DataPoint> BaselinePoints { get; }
         
+        // 添加多个数据系列
+        public ObservableCollection<DataPoint> RollDataPoints { get; }
+        public ObservableCollection<DataPoint> PitchDataPoints { get; }
+        public ObservableCollection<DataPoint> YawDataPoints { get; }
+        public ObservableCollection<DataPoint> GyroXDataPoints { get; }
+        public ObservableCollection<DataPoint> GyroYDataPoints { get; }
+        public ObservableCollection<DataPoint> GyroZDataPoints { get; }
+        
         // 如果不需要，直接删除这个字段
         // 或者在构造函数中使用它
-        public TestViewModel(DualSerialPortService dualSerialPortService, ConfigService configService, LoggingService loggingService) // 添加LoggingService参数
+        public TestViewModel(DualSerialPortService dualSerialPortService, ConfigService configService, LoggingService loggingService)
         {
             _dualSerialPortService = dualSerialPortService;
             _configService = configService;
-            _loggingService = loggingService; // 初始化日志服务
+            _loggingService = loggingService;
 
             _retryService = new RetryConnectionService(loggingService);
             
@@ -79,16 +85,23 @@ namespace IMUTestApp.ViewModels
             
             TestData = new ObservableCollection<IMUData>();
             
-            // 🔥 初始化图表数据集合
+            // 初始化所有数据系列
+            RollDataPoints = new ObservableCollection<DataPoint>();
+            PitchDataPoints = new ObservableCollection<DataPoint>();
+            YawDataPoints = new ObservableCollection<DataPoint>();
+            GyroXDataPoints = new ObservableCollection<DataPoint>();
+            GyroYDataPoints = new ObservableCollection<DataPoint>();
+            GyroZDataPoints = new ObservableCollection<DataPoint>();
+            
+            // 保留原有的其他集合
             ChartDataPoints = new ObservableCollection<DataPoint>();
             UpperLimitPoints = new ObservableCollection<DataPoint>();
             LowerLimitPoints = new ObservableCollection<DataPoint>();
             BaselinePoints = new ObservableCollection<DataPoint>();
             
-            // 初始化固定线条的数据点
             InitializeFixedLines();
-            
             ClearProductCodeCommand = new RelayCommand(ClearProductCode);
+            StopTestCommand = new RelayCommand(async () => await StopTestAsync(), () => IsTestRunning);
         }
         
         //绘制默认界面线条
@@ -115,10 +128,9 @@ namespace IMUTestApp.ViewModels
         {
             get
             {
-                // 🔥 每次访问时重新创建 PlotModel，并从 ViewModel 数据源同步数据
                 var plotModel = new PlotModel
                 {
-                    Title = "IMU传感器数据相对于基准值的偏差",
+                    Title = "IMU传感器数据实时监控",
                     Background = OxyColors.White
                 };
                 
@@ -126,7 +138,7 @@ namespace IMUTestApp.ViewModels
                 plotModel.Axes.Add(new LinearAxis
                 {
                     Position = AxisPosition.Bottom,
-                    Title = "采样点",
+                    Title = "数据点",
                     Minimum = 0,
                     Maximum = 30,
                     MajorStep = 5,
@@ -136,74 +148,217 @@ namespace IMUTestApp.ViewModels
                 plotModel.Axes.Add(new LinearAxis
                 {
                     Position = AxisPosition.Left,
-                    Title = "偏差值",
-                    Minimum = -600,
-                    Maximum = 600,
-                    MajorStep = 200,
-                    MinorStep = 100
+                    Title = "数值",
+                    MajorGridlineStyle = LineStyle.Solid,
+                    MinorGridlineStyle = LineStyle.Dot
                 });
                 
-                // 🔥 从 ViewModel 数据源创建系列
-                var dataSeries = new LineSeries
+                // 🔥 新增：添加偏差范围带
+                if (_tcpTestData != null && _tcpTestData.Count > 0)
                 {
-                    Title = "传感器数据",
+                    AddDeviationBands(plotModel);
+                }
+                
+                // 添加Roll数据系列
+                var rollSeries = new LineSeries
+                {
+                    Title = "Roll",
+                    Color = OxyColors.Red,
+                    StrokeThickness = 2
+                };
+                foreach (var point in RollDataPoints ?? new ObservableCollection<DataPoint>())
+                {
+                    rollSeries.Points.Add(point);
+                }
+                plotModel.Series.Add(rollSeries);
+                
+                // 添加Pitch数据系列
+                var pitchSeries = new LineSeries
+                {
+                    Title = "Pitch",
+                    Color = OxyColors.Green,
+                    StrokeThickness = 2
+                };
+                foreach (var point in PitchDataPoints ?? new ObservableCollection<DataPoint>())
+                {
+                    pitchSeries.Points.Add(point);
+                }
+                plotModel.Series.Add(pitchSeries);
+                
+                // 添加Yaw数据系列
+                var yawSeries = new LineSeries
+                {
+                    Title = "Yaw",
                     Color = OxyColors.Blue,
                     StrokeThickness = 2
                 };
-                foreach (var point in ChartDataPoints)
+                foreach (var point in YawDataPoints ?? new ObservableCollection<DataPoint>())
                 {
-                    dataSeries.Points.Add(point);
+                    yawSeries.Points.Add(point);
                 }
-                plotModel.Series.Add(dataSeries);
+                plotModel.Series.Add(yawSeries);
                 
-                var upperLimitSeries = new LineSeries
+                // 添加GyroX数据系列
+                var gyroXSeries = new LineSeries
                 {
-                    Title = "上限",
-                    Color = OxyColors.Red,
+                    Title = "GyroX",
+                    Color = OxyColors.Orange,
                     StrokeThickness = 1,
                     LineStyle = LineStyle.Dash
                 };
-                foreach (var point in UpperLimitPoints)
+                foreach (var point in GyroXDataPoints ?? new ObservableCollection<DataPoint>())
                 {
-                    upperLimitSeries.Points.Add(point);
+                    gyroXSeries.Points.Add(point);
                 }
-                plotModel.Series.Add(upperLimitSeries);
+                plotModel.Series.Add(gyroXSeries);
                 
-                var lowerLimitSeries = new LineSeries
+                // 添加GyroY数据系列
+                var gyroYSeries = new LineSeries
                 {
-                    Title = "下限",
-                    Color = OxyColors.Red,
+                    Title = "GyroY",
+                    Color = OxyColors.Purple,
                     StrokeThickness = 1,
                     LineStyle = LineStyle.Dash
                 };
-                foreach (var point in LowerLimitPoints)
+                foreach (var point in GyroYDataPoints ?? new ObservableCollection<DataPoint>())
                 {
-                    lowerLimitSeries.Points.Add(point);
+                    gyroYSeries.Points.Add(point);
                 }
-                plotModel.Series.Add(lowerLimitSeries);
+                plotModel.Series.Add(gyroYSeries);
                 
-                var baselineSeries = new LineSeries
+                // 添加GyroZ数据系列
+                var gyroZSeries = new LineSeries
                 {
-                    Title = "基准线",
-                    Color = OxyColors.Green,
+                    Title = "GyroZ",
+                    Color = OxyColors.Brown,
                     StrokeThickness = 1,
-                    LineStyle = LineStyle.Dot
+                    LineStyle = LineStyle.Dash
                 };
-                foreach (var point in BaselinePoints)
+                foreach (var point in GyroZDataPoints ?? new ObservableCollection<DataPoint>())
                 {
-                    baselineSeries.Points.Add(point);
+                    gyroZSeries.Points.Add(point);
                 }
-                plotModel.Series.Add(baselineSeries);
+                plotModel.Series.Add(gyroZSeries);
+                
+                // 修复图例设置 - 使用正确的属性
+                plotModel.IsLegendVisible = true;
                 
                 return plotModel;
             }
+        }
+        
+        // 🔥 新增：添加偏差范围带的方法
+        private void AddDeviationBands(PlotModel plotModel)
+        {
+            if (_tcpTestData == null || _tcpTestData.Count == 0) return;
+            
+            // 计算各参数的偏差值
+            var gyroXValues = _tcpTestData.Select(d => d.GyroX).ToList();
+            var gyroYValues = _tcpTestData.Select(d => d.GyroY).ToList();
+            var pitchValues = _tcpTestData.Select(d => d.Pitch).ToList();
+            var rollValues = _tcpTestData.Select(d => d.Roll).ToList();
+            
+            var gyroXMin = gyroXValues.Min();
+            var gyroXMax = gyroXValues.Max();
+            var gyroYMin = gyroYValues.Min();
+            var gyroYMax = gyroYValues.Max();
+            var pitchMin = pitchValues.Min();
+            var pitchMax = pitchValues.Max();
+            var rollMin = rollValues.Min();
+            var rollMax = rollValues.Max();
+            
+            // 添加Roll偏差范围带
+            var rollDeviationArea = new AreaSeries
+            {
+                Title = "Roll偏差范围",
+                Color = OxyColor.FromArgb(50, 255, 0, 0), // 半透明红色
+                Fill = OxyColor.FromArgb(30, 255, 0, 0),
+                StrokeThickness = 1,
+                LineStyle = LineStyle.Dot
+            };
+            
+            // 为整个数据范围添加偏差带
+            for (int i = 0; i <= 30; i++)
+            {
+                rollDeviationArea.Points.Add(new DataPoint(i, rollMax));
+            }
+            for (int i = 30; i >= 0; i--)
+            {
+                rollDeviationArea.Points2.Add(new DataPoint(i, rollMin));
+            }
+            plotModel.Series.Add(rollDeviationArea);
+            
+            // 添加Pitch偏差范围带
+            var pitchDeviationArea = new AreaSeries
+            {
+                Title = "Pitch偏差范围",
+                Color = OxyColor.FromArgb(50, 0, 255, 0), // 半透明绿色
+                Fill = OxyColor.FromArgb(30, 0, 255, 0),
+                StrokeThickness = 1,
+                LineStyle = LineStyle.Dot
+            };
+            
+            for (int i = 0; i <= 30; i++)
+            {
+                pitchDeviationArea.Points.Add(new DataPoint(i, pitchMax));
+            }
+            for (int i = 30; i >= 0; i--)
+            {
+                pitchDeviationArea.Points2.Add(new DataPoint(i, pitchMin));
+            }
+            plotModel.Series.Add(pitchDeviationArea);
+            
+            // 添加GyroX偏差范围带
+            var gyroXDeviationArea = new AreaSeries
+            {
+                Title = "GyroX偏差范围",
+                Color = OxyColor.FromArgb(50, 255, 165, 0), // 半透明橙色
+                Fill = OxyColor.FromArgb(30, 255, 165, 0),
+                StrokeThickness = 1,
+                LineStyle = LineStyle.Dot
+            };
+            
+            for (int i = 0; i <= 30; i++)
+            {
+                gyroXDeviationArea.Points.Add(new DataPoint(i, gyroXMax));
+            }
+            for (int i = 30; i >= 0; i--)
+            {
+                gyroXDeviationArea.Points2.Add(new DataPoint(i, gyroXMin));
+            }
+            plotModel.Series.Add(gyroXDeviationArea);
+            
+            // 添加GyroY偏差范围带
+            var gyroYDeviationArea = new AreaSeries
+            {
+                Title = "GyroY偏差范围",
+                Color = OxyColor.FromArgb(50, 128, 0, 128), // 半透明紫色
+                Fill = OxyColor.FromArgb(30, 128, 0, 128),
+                StrokeThickness = 1,
+                LineStyle = LineStyle.Dot
+            };
+            
+            for (int i = 0; i <= 30; i++)
+            {
+                gyroYDeviationArea.Points.Add(new DataPoint(i, gyroYMax));
+            }
+            for (int i = 30; i >= 0; i--)
+            {
+                gyroYDeviationArea.Points2.Add(new DataPoint(i, gyroYMin));
+            }
+            plotModel.Series.Add(gyroYDeviationArea);
         }
         
         //返回测试状态
         public bool IsTestRunning
         {
             get => _isTestRunning;
-            set => SetProperty(ref _isTestRunning, value);
+            set 
+            {
+                SetProperty(ref _isTestRunning, value);
+                // 通知停止测试命令状态变更
+                (StopTestCommand as RelayCommand)?.RaiseCanExecuteChanged();
+            }
         }
         
         //接收到的数据包数量
@@ -294,6 +449,7 @@ namespace IMUTestApp.ViewModels
         }
         
         public ICommand ClearProductCodeCommand { get; }
+        public ICommand StopTestCommand { get; }
         
         //清除产品代码
         private void ClearProductCode()
@@ -306,16 +462,16 @@ namespace IMUTestApp.ViewModels
             DataDisplay = "等待输入产品编码...";
             
             // 清空图表数据
-            ChartDataPoints.Clear();
-            // 🔥 添加空值检查
-            OnPropertyChanged(nameof(PlotModel));
+            ClearChartData();
         }
         
+        DeviceInfo? deviceInfo;
         //开始测试
         private async void StartTest()
         {
             if (IsTestRunning) return;
             
+            ProductCode = "";
             IsTestRunning = true;
             _testStartTime = DateTime.Now;
             TestDateTime = _testStartTime.ToString("yyyy-MM-dd HH:mm:ss");
@@ -331,26 +487,7 @@ namespace IMUTestApp.ViewModels
             TestResultDetails = "测试进行中...";
             
             // 清空图表数据
-            ChartDataPoints.Clear();
-            PlotModel?.InvalidatePlot(true);
-            
-            // 初始化测试定时器
-            if (_testTimer == null)
-            {
-                _testTimer = new DispatcherTimer
-                {
-                    Interval = TimeSpan.FromSeconds(30)
-                };
-                _testTimer.Tick += async (s, e) =>
-                {
-                    _testTimer.Stop();
-                    if (IsTestRunning)
-                    {
-                        _loggingService.LogInfo(LogCategory.IMUData, "测试达到预设时间，自动停止");
-                        await StopTestAsync();
-                    }
-                };
-            }
+            ClearChartData();
             
             try
             {
@@ -365,7 +502,7 @@ namespace IMUTestApp.ViewModels
                 }
                 
                 // Step 2: 获取设备信息
-                var deviceInfo = await Step2_GetDeviceInfo();
+                deviceInfo = await Step2_GetDeviceInfo();
                 if (deviceInfo == null)
                 {
                     await CleanupAfterFailure("获取设备信息失败");
@@ -375,8 +512,11 @@ namespace IMUTestApp.ViewModels
                 // Step 3: 连接WiFi
                 if (!await Step3_ConnectWiFi(deviceInfo.ApName))
                 {
-                    await CleanupAfterFailure("WiFi连接失败");
-                    return;
+                    if(await ConnectToOpenWiFiUsingNetshAsync(deviceInfo.ApName) == false)
+                    {
+                        await CleanupAfterFailure("WiFi连接失败");
+                        return;
+                    }
                 }
                 
                 // Step 4: TCP协议测试
@@ -386,9 +526,8 @@ namespace IMUTestApp.ViewModels
                     return;
                 }
                 
-                // 启动定时器
+                // 启动运行时间显示定时器
                 _timer.Start();
-                _testTimer.Start();
             }
             catch (Exception ex)
             {
@@ -397,9 +536,13 @@ namespace IMUTestApp.ViewModels
             }
         }
         
+
+        
         // 步骤1：控制波轮电机
         private async Task<bool> Step1_ControlMotor()
         {
+            if (!IsTestRunning) return false; // 添加状态检查
+            
             try
             {
                 _loggingService.LogDebug(LogCategory.IMUData, "步骤1: 开始启动波轮电机");
@@ -409,7 +552,7 @@ namespace IMUTestApp.ViewModels
                 config => _dualSerialPortService.ConnectWheelMotor(config),
                 _configService.WheelMotorPort,
                 "波轮电机串口",
-                maxRetries: 3,
+                maxRetries: 30,
                 timeoutSeconds: 10,
                 progressCallback: message => DataDisplay += $"{message}\n"
                 );
@@ -425,6 +568,7 @@ namespace IMUTestApp.ViewModels
                     await Task.Delay(2000);
                     _loggingService.LogInfo(LogCategory.IMUData, "波轮电机已启动至50%转速");
                     DataDisplay += "波轮电机已启动至50%转速\n";
+                    await _dualSerialPortService.SendToWheelMotorAsync("fan pwm 50\r\n");
                     return true;
                 }
                 else
@@ -445,17 +589,21 @@ namespace IMUTestApp.ViewModels
         {
             DataDisplay += "\n步骤2: 获取IMU设备信息...\n";
 
+            //防止上一步出现问题，重复向轮子发信息
+            await _dualSerialPortService.SendToWheelMotorAsync("fan pwm 50\r\n");
+
             bool connected = await _retryService.RetryConnectionAsync(
             config => _dualSerialPortService.ConnectIMU(config),
             _configService.IMUPort,
             "IMU串口",
-            maxRetries: 3,
-            timeoutSeconds: 15,
+            maxRetries: 100,
+            timeoutSeconds: 1500,
             progressCallback: message => DataDisplay += $"{message}\n"
             );
-            
-            if (connected && _dualSerialPortService?.IsIMUConnected == true)
 
+            DeviceInfo? response;
+
+            if (connected && _dualSerialPortService?.IsIMUConnected == true)
             {
                 // 发送设备信息请求
                 var request = "{\"DevInfo\":{}}";
@@ -463,22 +611,27 @@ namespace IMUTestApp.ViewModels
                 DataDisplay += $"已发送请求: {request}\n";
                 
                 // 等待响应（这里需要实现响应解析逻辑）
-                var response = await WaitForDeviceInfoResponse();
+                 response = await WaitForDeviceInfoResponse();
                 
-                if (response != null)
+                //解析结果不对
+                if (response != null && response.ApName != "")
                 {
                     DataDisplay += $"设备信息: 产品={response.Product}, 固件版本={response.FwVer}\n";
                     DataDisplay += $"热点名称: {response.ApName}\n";
+                    
                     return response;
                 }
                 else
                 {
-                    throw new Exception("未收到设备信息响应");
+                    _dualSerialPortService.DisconnectIMUSafely();
+                     response = await Step2_GetDeviceInfo();
+                     return response;
                 }
             }
             else
             {
-                throw new Exception("IMU串口未连接");
+                response = await Step2_GetDeviceInfo();
+                return response;
             }
         }
         
@@ -500,8 +653,8 @@ namespace IMUTestApp.ViewModels
                     async config => await ConnectToWiFiAsync(config.SSID, config.Password),
                     wifiConfig,
                     $"WiFi热点 {apName}",
-                    maxRetries: 3,
-                    timeoutSeconds: 15,
+                    maxRetries: 100,
+                    timeoutSeconds: 1500,
                     progressCallback: message => DataDisplay += $"{message}\n"
                 );
                 
@@ -528,22 +681,53 @@ namespace IMUTestApp.ViewModels
         {
             DataDisplay += "\n步骤4: 开始TCP协议测试...\n";
             
+            // 获取TCP配置
+            var config = _configService.Config;
+            string ipAddress = config.TcpConfig.IpAddress;
+            int port = config.TcpConfig.Port; 
+            DataDisplay += $"IP地址: {ipAddress}, 端口: {port}\n";
+
             try
             {
-                // 获取TCP配置
-                var config = _configService.Config;
-                string ipAddress = config.TcpConfig.IpAddress;
-                int port = config.TcpConfig.Port; 
-                
                 using (var tcpClient = new System.Net.Sockets.TcpClient())
                 {
-                    await tcpClient.ConnectAsync(ipAddress, port);
+                    // 设置超时
+                    tcpClient.ReceiveTimeout = 10000;
+                    tcpClient.SendTimeout = 10000;
+                    
+                    // 使用重试服务进行连接
+                bool connected = await _retryService.RetryConnectionAsync(
+                    async config => 
+                    {
+                        try 
+                        {
+                            await tcpClient.ConnectAsync(config.IPAddress, config.Port);
+                            return true;
+                        }
+                        catch
+                        {
+                            return false;
+                        }
+                    },
+                    new { IPAddress = ipAddress, Port = port },
+                    $"TCP连接 {ipAddress}:{port}",
+                    maxRetries: 50,
+                    timeoutSeconds: 80,
+                    progressCallback: message => DataDisplay += $"{message}\n"
+                );
+                    
+                    if (!connected)
+                    {
+                        throw new Exception("TCP连接失败");
+                    }
+                    
                     DataDisplay += $"TCP连接已建立: {ipAddress}:{port}\n";
                     
                     var stream = tcpClient.GetStream();
                     
                     // 发送空JSON请求获取IMU数据
-                    string request = "{\"IMU\":{}}";
+                    string request = "{\"IMU\":{}}"+ "\r\n";
+                    _loggingService.LogInfo(LogCategory.TCP, $"发送请求: {request}");
                     byte[] requestData = System.Text.Encoding.UTF8.GetBytes(request);
                     await stream.WriteAsync(requestData, 0, requestData.Length);
                     DataDisplay += $"发送请求: {request}\n";
@@ -588,18 +772,26 @@ namespace IMUTestApp.ViewModels
         // 执行连续IMU测试
         private async Task ContinuousIMUDataCollection(System.Net.Sockets.NetworkStream stream)
         {
-            DataDisplay += "\n开始连续IMU测试...\n";
+            DataDisplay += "\n开始连续IMU测试（30次数据采集）...\n";
             _tcpTestData.Clear();
             
-            // 设置测试时间（例如30秒）
-            var testEndTime = DateTime.Now.AddSeconds(30);
+            // 清空所有图表数据
+            Application.Current.Dispatcher.Invoke(() =>
+            {
+                ClearChartData();
+            });
+            
+            // 设置循环30次
+            int totalRequests = 30;
             string request = "{\"IMU\":{}}";
             byte[] requestData = System.Text.Encoding.UTF8.GetBytes(request);
             
-            while (DateTime.Now < testEndTime && IsTestRunning)
+            for (int i = 0; i < totalRequests && IsTestRunning; i++)
             {
                 try
                 {
+                    DataDisplay += $"发送第 {i + 1} 次请求...\n";
+                    
                     // 发送请求
                     await stream.WriteAsync(requestData, 0, requestData.Length);
                     
@@ -615,22 +807,78 @@ namespace IMUTestApp.ViewModels
                         _tcpTestData.Add(imuData);
                         
                         // 更新显示
-                        DataDisplay += $"IMU数据 - Roll: {imuData.Roll:F2}, Pitch: {imuData.Pitch:F2}, " +
+                        DataDisplay += $"第 {i + 1} 次 - IMU数据 - Roll: {imuData.Roll:F2}, Pitch: {imuData.Pitch:F2}, " +
                                      $"Yaw: {imuData.Yaw:F2}, GyroX: {imuData.GyroX:F2}, GyroY: {imuData.GyroY:F2}\n";
+                        
+                        // 每获取到一个数据就更新图表
+                        UpdateChart(imuData);
+                    }
+                    else
+                    {
+                        DataDisplay += $"第 {i + 1} 次请求未获取到有效数据\n";
                     }
                     
                     // 等待一段时间再发送下一个请求
-                    await Task.Delay(100);
+                    await Task.Delay(1000);
                 }
                 catch (Exception ex)
                 {
-                    DataDisplay += $"读取IMU数据时出错: {ex.Message}\n";
+                    DataDisplay += $"第 {i + 1} 次请求时出错: {ex.Message}\n";
                     break;
                 }
             }
             
+            DataDisplay += $"\n完成 {_tcpTestData.Count} 次有效数据采集\n";
+            
             // 分析测试结果
             AnalyzeIMUTestResults();
+
+            if (IsTestRunning)
+            {
+                DataDisplay += "\n测试完成，正在停止...\n";
+                await StopTestAsync();
+            }
+        }
+        
+        // 添加更新图表的方法
+        private void UpdateChart(IMUData imuData)
+        {
+            Application.Current.Dispatcher.Invoke(() =>
+            {
+                try
+                {
+                    int dataPointIndex = _tcpTestData.Count;
+                    
+                    // 添加所有数据系列的数据点
+                    RollDataPoints.Add(new DataPoint(dataPointIndex, imuData.Roll));
+                    PitchDataPoints.Add(new DataPoint(dataPointIndex, imuData.Pitch));
+                    YawDataPoints.Add(new DataPoint(dataPointIndex, imuData.Yaw));
+                    GyroXDataPoints.Add(new DataPoint(dataPointIndex, imuData.GyroX));
+                    GyroYDataPoints.Add(new DataPoint(dataPointIndex, imuData.GyroY));
+                    GyroZDataPoints.Add(new DataPoint(dataPointIndex, imuData.GyroZ));
+                    
+                    // 限制数据点数量（保持最近30个点）
+                    const int maxPoints = 30;
+                    if (RollDataPoints.Count > maxPoints)
+                    {
+                        RollDataPoints.RemoveAt(0);
+                        PitchDataPoints.RemoveAt(0);
+                        YawDataPoints.RemoveAt(0);
+                        GyroXDataPoints.RemoveAt(0);
+                        GyroYDataPoints.RemoveAt(0);
+                        GyroZDataPoints.RemoveAt(0);
+                    }
+                    
+                    // 通知PlotModel属性更新
+                    OnPropertyChanged(nameof(PlotModel));
+                    
+                    _loggingService?.LogInfo(LogCategory.TCP, $"图表已更新 - 数据点: {dataPointIndex}");
+                }
+                catch (Exception ex)
+                {
+                    _loggingService?.LogError(LogCategory.TCP, $"更新图表时出错: {ex.Message}");
+                }
+            });
         }
         
         // 解析IMU响应数据
@@ -675,7 +923,7 @@ namespace IMUTestApp.ViewModels
         // 分析IMU测试结果
         private void AnalyzeIMUTestResults()
         {
-            if (_tcpTestData.Count == 0)
+            if (_tcpTestData.Count < 30)
             {
                 DataDisplay += "\n测试结果: NG - 未获取到有效数据\n";
                 TestResult = "NG";
@@ -735,6 +983,7 @@ namespace IMUTestApp.ViewModels
                 TestResult = "PASS";
                 TestResultDetails = "所有IMU参数变化范围均在500以内，测试通过";
                 DataDisplay += "\n测试结果: PASS - 所有参数变化范围正常\n";
+                SaveData();
             }
             else
             {
@@ -756,7 +1005,6 @@ namespace IMUTestApp.ViewModels
                 
                 // 停止测试
                 IsTestRunning = false;
-                _testTimer?.Stop();
                 _timer?.Stop();
                 
                 // 关闭电机
@@ -805,12 +1053,13 @@ namespace IMUTestApp.ViewModels
         // 改进现有的 StopTestAsync 方法
         public async Task StopTestAsync()
         {
+            deviceInfo = null;
+            wifi = null;
             if (!IsTestRunning && !_isCleanupInProgress) return;
             
-            _loggingService.LogInfo(LogCategory.IMUData, "手动停止测试");
+            _loggingService.LogInfo(LogCategory.IMUData, "停止测试");
             
             IsTestRunning = false;
-            _testTimer?.Stop();
             _timer?.Stop();
             
             try
@@ -824,21 +1073,31 @@ namespace IMUTestApp.ViewModels
                     DataDisplay += "\n波轮电机已关闭\n";
                 }
                 
-                var testDuration = DateTime.Now - _testStartTime;
-                _loggingService.LogInfo(LogCategory.IMUData, $"测试持续时间: {testDuration.TotalSeconds:F1}秒");
-                _loggingService.LogInfo(LogCategory.IMUData, $"测试结果: {TestResult}");
-                
-                EvaluateTestResult();
-                
-                var endTime = DateTime.Now;
-                DataDisplay += $"\n测试结束时间: {endTime:yyyy-MM-dd HH:mm:ss}";
-                DataDisplay += $"\n测试结果: {TestResult}";
-                DataDisplay += $"\n{TestResultDetails}";
-                
-                if (AutoSaveEnabled && TestData.Count > 0)
+                // 断开串口连接
+                try
                 {
-                    SaveData();
+                    if (_dualSerialPortService != null)
+                    {
+                        _dualSerialPortService.Dispose();
+                        _loggingService.LogInfo(LogCategory.SerialPort, "串口连接已断开");
+                        DataDisplay += "串口连接已断开\n";
+                    }
                 }
+                catch (Exception ex)
+                {
+                    _loggingService.LogError(LogCategory.SerialPort, $"断开串口连接失败: {ex.Message}");
+                }
+                
+                // 清理测试数据
+                _tcpTestData.Clear();
+                
+                // 更新UI显示
+                DataDisplay += "\n测试已停止，所有资源已释放\n";
+                TestResult = string.Empty;
+                TestResultDetails = "测试停止";
+                
+                _loggingService.LogInfo(LogCategory.IMUData, "测试停止完成，资源已释放");
+     
             }
             catch (Exception ex)
             {
@@ -877,159 +1136,100 @@ namespace IMUTestApp.ViewModels
             }
         }
         
-        private void EvaluateTestResult()
-        {
-           // _loggingService.LogDebug(LogCategory.IMUData, "开始评估测试结果");
-            
-            // 示例测试判定逻辑
-            bool isPass = true;
-            var details = new StringBuilder();
-            
-            // 检查数据包数量
-            if (PacketCount < 10)
-            {
-                isPass = false;
-                details.AppendLine("数据包数量不足");
-                _loggingService.LogWarn(LogCategory.IMUData, $"数据包数量不足: {PacketCount} < 10");
-            }
-            else
-            {
-                details.AppendLine($"数据包数量: {PacketCount} ✓");
-                _loggingService.LogDebug(LogCategory.IMUData, $"数据包数量检查通过: {PacketCount}");
-            }
-            
-            // 检查测试时长
-            var testDuration = DateTime.Now - _testStartTime;
-            if (testDuration.TotalSeconds < 5)
-            {
-                isPass = false;
-                details.AppendLine("测试时长不足");
-                _loggingService.LogWarn(LogCategory.IMUData, $"测试时长不足: {testDuration.TotalSeconds:F1}秒 < 5秒");
-            }
-            else
-            {
-                details.AppendLine($"测试时长: {testDuration.TotalSeconds:F1}秒 ✓");
-                _loggingService.LogDebug(LogCategory.IMUData, $"测试时长检查通过: {testDuration.TotalSeconds:F1}秒");
-            }
-            
-            // 检查采样率稳定性
-            if (SampleRate.Contains("0 Hz"))
-            {
-                isPass = false;
-                details.AppendLine("采样率异常");
-                _loggingService.LogWarn(LogCategory.IMUData, $"采样率异常: {SampleRate}");
-            }
-            else
-            {
-                details.AppendLine($"采样率: {SampleRate} ✓");
-                _loggingService.LogDebug(LogCategory.IMUData, $"采样率检查通过: {SampleRate}");
-            }
-            
-            TestResult = isPass ? "PASS" : "NG";
-            TestResultDetails = details.ToString().Trim();
-            
-            _loggingService.LogInfo(LogCategory.IMUData, $"测试结果评估完成 - 产品编码: {ProductCode}, 结果: {TestResult}");
-            if (!isPass)
-            {
-                _loggingService.LogWarn(LogCategory.IMUData, $"测试失败详情: {TestResultDetails}");
-            }
-        }
-        
         private void SaveData()
         {
             try
             {
                 _loggingService.LogDebug(LogCategory.FileIO, $"开始保存测试数据 - 产品编码: {ProductCode}");
                 
-                var fileName = $"IMU_Test_{ProductCode}_{DateTime.Now:yyyyMMdd_HHmmss}.txt";
-                var filePath = Path.Combine("Data", fileName);
+                var dataPath = _configService.Config.GeneralSettings.DataPath;
+                if (!Directory.Exists(dataPath))
+                {
+                    Directory.CreateDirectory(dataPath);
+                }
                 
-                // 确保Data目录存在
-                Directory.CreateDirectory("Data");
+                // 生成CSV文件名，包含产品编码和时间戳
+                var timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
+                var csvFileName = $"{ProductCode}_{timestamp}.csv";
+                var csvFilePath = Path.Combine(dataPath, csvFileName);
                 
-                var content = new StringBuilder();
-                content.AppendLine($"产品编码: {ProductCode}");
-                content.AppendLine($"测试时间: {TestDateTime}");
-                content.AppendLine($"测试结果: {TestResult}");
-                content.AppendLine($"测试详情: {TestResultDetails}");
-                content.AppendLine($"数据包总数: {PacketCount}");
-                content.AppendLine($"采样率: {SampleRate}");
-                content.AppendLine($"运行时间: {RunTime}");
-                content.AppendLine();
-                content.AppendLine("详细数据:");
-                content.AppendLine(DataDisplay);
+                var csvContent = new StringBuilder();
                 
-                File.WriteAllText(filePath, content.ToString(), Encoding.UTF8);
+                // 添加CSV头部信息
+                csvContent.AppendLine("# IMU测试数据报告");
+                csvContent.AppendLine($"# 产品编码: {ProductCode}");
+                csvContent.AppendLine($"# 测试时间: {TestDateTime}");
+                csvContent.AppendLine($"# 测试结果: {TestResult}");
+                csvContent.AppendLine($"# 测试详情: {TestResultDetails}");
+                csvContent.AppendLine($"# 设备信息: {deviceInfo}");
+                csvContent.AppendLine($"# 连接信息: {wifi}");
+                csvContent.AppendLine("#");
                 
-                DataDisplay += $"\n\n数据已自动保存到: {filePath}";
+                // 添加CSV列标题
+                csvContent.AppendLine("Timestamp,AccelX,AccelY,AccelZ,GyroX,GyroY,GyroZ,MagX,MagY,MagZ,Roll,Pitch,Yaw");
+                
+                // 添加TCP测试数据
+                if (_tcpTestData != null && _tcpTestData.Count > 0)
+                {
+                    foreach (var data in _tcpTestData)
+                    {
+                        csvContent.AppendLine($"{data.Timestamp:yyyy-MM-dd HH:mm:ss.fff}," +
+                                            $"{data.AccelX:F6},{data.AccelY:F6},{data.AccelZ:F6}," +
+                                            $"{data.GyroX:F6},{data.GyroY:F6},{data.GyroZ:F6}," +
+                                            $"{data.MagX:F6},{data.MagY:F6},{data.MagZ:F6}," +
+                                            $"{data.Roll:F6},{data.Pitch:F6},{data.Yaw:F6}");
+                    }
+                }
+                else
+                {
+                    csvContent.AppendLine("# 无TCP测试数据");
+                }
+                
+                // 保存CSV文件
+                File.WriteAllText(csvFilePath, csvContent.ToString(), Encoding.UTF8);
+                
+                // 同时保存一个包含详细日志的文本文件
+                var logFileName = $"{ProductCode}_{timestamp}_log.txt";
+                var logFilePath = Path.Combine(dataPath, logFileName);
+                
+                var logContent = new StringBuilder();
+                logContent.AppendLine($"产品编码: {ProductCode}");
+                logContent.AppendLine($"测试时间: {TestDateTime}");
+                logContent.AppendLine($"测试结果: {TestResult}");
+                logContent.AppendLine($"测试详情: {TestResultDetails}");
+                logContent.AppendLine($"数据包总数: {PacketCount}");
+                logContent.AppendLine($"采样率: {SampleRate}");
+                logContent.AppendLine($"运行时间: {RunTime}");
+                logContent.AppendLine();
+                logContent.AppendLine("详细测试日志:");
+                logContent.AppendLine(DataDisplay);
+                
+                File.WriteAllText(logFilePath, logContent.ToString(), Encoding.UTF8);
+                
+                DataDisplay += $"\n\nCSV数据已保存到: {csvFilePath}";
+                DataDisplay += $"\n详细日志已保存到: {logFilePath}";
+                
+                _loggingService.LogInfo(LogCategory.FileIO, $"数据保存完成 - CSV: {csvFilePath}, 日志: {logFilePath}");
             }
             catch (Exception ex)
             {
-                DataDisplay += $"\n\n保存失败: {ex.Message}";
+                var errorMsg = $"保存失败: {ex.Message}";
+                DataDisplay += $"\n\n{errorMsg}";
+                _loggingService.LogError(LogCategory.FileIO, errorMsg);
             }
         }
         
         // 🔥 新增：清除图表数据的方法
         public void ClearChartData()
         {
-            ChartDataPoints.Clear();
+            ChartDataPoints?.Clear();
+            RollDataPoints?.Clear();
+            PitchDataPoints?.Clear();
+            YawDataPoints?.Clear();
+            GyroXDataPoints?.Clear();
+            GyroYDataPoints?.Clear();
+            GyroZDataPoints?.Clear();
             OnPropertyChanged(nameof(PlotModel));
-        }
-        
-        // 🔥 新增：重置测试数据的方法
-        private void ResetTestData()
-        {
-            TestData.Clear();
-            ClearChartData();
-            PacketCount = 0;
-            RunTime = "00:00:00";
-            SampleRate = "0 Hz";
-            DataDisplay = "等待输入产品编码...";
-        }
-        
-        private void OnDataReceived(object? sender, IMUData data)
-        {
-            if (!IsTestRunning) return;
-            
-            // 使用Dispatcher确保在UI线程执行
-            Application.Current.Dispatcher.Invoke(() =>
-            {
-                TestData.Add(data);
-                PacketCount++;
-                
-                // 计算相对于基准值的偏差（这里以AccelX为例）
-                double baselineValue = 0.0; // 基准值
-                double deviation = (data.AccelX - baselineValue) * 1000; // 转换为合适的单位
-                
-                // 🔥 添加到 ViewModel 的数据集合中
-                ChartDataPoints.Add(new DataPoint(PacketCount, deviation));
-                
-                // 限制图表数据点数量（保持最近30个点）
-                if (ChartDataPoints.Count > 30)
-                {
-                    ChartDataPoints.RemoveAt(0);
-                    
-                    // 重新调整X轴坐标
-                    for (int i = 0; i < ChartDataPoints.Count; i++)
-                    {
-                        ChartDataPoints[i] = new DataPoint(i + 1, ChartDataPoints[i].Y);
-                    }
-                }
-                
-                // 🔥 通知 PlotModel 属性更新，触发图表重新绘制
-                OnPropertyChanged(nameof(PlotModel));
-                
-                // 更新数据显示
-                DataDisplay += $"[{DateTime.Now:HH:mm:ss.fff}] X:{data.AccelX:F3} Y:{data.AccelY:F3} Z:{data.AccelZ:F3}\n";
-                
-                // 计算采样率
-                if (TestData.Count > 1)
-                {
-                    var timeSpan = DateTime.Now - _testStartTime;
-                    var rate = PacketCount / timeSpan.TotalSeconds;
-                    SampleRate = $"{rate:F1} Hz";
-                }
-            });
         }
         
         private void OnTimerTick(object? sender, EventArgs e)
@@ -1042,7 +1242,7 @@ namespace IMUTestApp.ViewModels
         }
         
         
-private async Task<DeviceInfo?> WaitForDeviceInfoResponse()
+        private async Task<DeviceInfo?> WaitForDeviceInfoResponse()
         {
             try
             {
@@ -1078,13 +1278,14 @@ private async Task<DeviceInfo?> WaitForDeviceInfoResponse()
             _deviceInfoTaskSource?.TrySetResult(data);
         }
 
+        Wifi? wifi;
         private async Task<bool> ConnectToWiFiAsync(string ssid, string password = null)
         {
             try
             {
                 _loggingService?.LogInfo(LogCategory.TCP, $"开始连接WiFi: {ssid}");
                 
-                var wifi = new Wifi();
+                wifi = new Wifi();
                 var accessPoints = await Task.Run(() => wifi.GetAccessPoints());
                 
                 if (accessPoints == null || !accessPoints.Any())
@@ -1104,6 +1305,7 @@ private async Task<DeviceInfo?> WaitForDeviceInfoResponse()
                 _loggingService?.LogInfo(LogCategory.TCP, $"找到目标网络: {targetAP.Name}, 信号强度: {targetAP.SignalStrength}, 是否需要密码: {targetAP.IsSecure}");
 
                 var authRequest = new AuthRequest(targetAP);
+
                 // 检查是否为开放网络
                 if (!targetAP.IsSecure)
                 {

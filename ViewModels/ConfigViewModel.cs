@@ -186,7 +186,8 @@ namespace IMUTestApp.ViewModels
             _secondConfig = config.IMUConfig;
             _tcpIpAddress = config.TcpConfig.IpAddress;
             _tcpPort = config.TcpConfig.Port;
-            
+
+                      
             // 触发属性更新通知
             OnPropertyChanged(nameof(SelectedPort));
             OnPropertyChanged(nameof(SelectedBaudRate));
@@ -196,9 +197,14 @@ namespace IMUTestApp.ViewModels
             OnPropertyChanged(nameof(SecondSelectedBaudRate));
             OnPropertyChanged(nameof(TcpIpAddress));
             OnPropertyChanged(nameof(TcpPort));
+
+            AvailablePorts.Add(config.WheelMotorConfig.PortName);
+            AvailablePorts.Add(config.IMUConfig.PortName);
+            SelectedPort = config.WheelMotorConfig.PortName;
+            SecondSelectedPort = config.IMUConfig.PortName;
             
             // 加载配置后刷新串口，确保选择有效的串口
-            RefreshPorts();
+            //RefreshPorts();
         }
     }
 }

@@ -32,6 +32,11 @@ namespace IMUTestApp.Services
             {
                 _wheelMotorPort = new SerialPort(config.PortName, config.BaudRate);
                 _wheelMotorPort.Open();
+                _disposed = false;
+                if(!_wheelMotorPort.IsOpen)
+                {
+                    throw new Exception("Open Failed");
+                }
                 _logger.LogInfo(LogCategory.SerialPort, $"轮子电机串口连接成功: {config.PortName}");
                 return true;
             }
@@ -53,6 +58,8 @@ namespace IMUTestApp.Services
                 _imuPort = new SerialPort(config.PortName, config.BaudRate);
                 _imuPort.DataReceived += OnIMUPortDataReceived;  // 添加这行
                 _imuPort.Open();
+                _disposed = false;
+                
                 _logger.LogInfo(LogCategory.SerialPort, $"IMU串口连接成功: {config.PortName}");
                 return true;
             }
@@ -172,7 +179,7 @@ namespace IMUTestApp.Services
                     {
                         try
                         {
-                            _wheelMotorPort.Write("{\"cmd\":\"stop\"}");
+                            _wheelMotorPort.Write("{\"fan pwm 0\"}");
                             System.Threading.Thread.Sleep(200); // 简单等待
                         }
                         catch { /* 忽略发送停止指令的异常 */ }

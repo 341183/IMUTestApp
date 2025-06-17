@@ -19,7 +19,6 @@
                             <ColumnDefinition Width="*" MinWidth="120"/>
                             <ColumnDefinition Width="Auto"/>
                             <ColumnDefinition Width="*" MinWidth="120"/>
-                            <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
                         
                         <TextBlock Grid.Column="0" Text="串口:" VerticalAlignment="Center" Margin="0,0,10,0"/>
@@ -31,14 +30,8 @@
                         <TextBlock Grid.Column="2" Text="波特率:" VerticalAlignment="Center" Margin="0,0,10,0"/>
                         <ComboBox Grid.Column="3"
                                   ItemsSource="{Binding BaudRates}"
-                                  SelectedItem="{Binding SelectedBaudRate}"
-                                  Margin="0,0,20,0"/>
-                        
-                        <Button Grid.Column="4" Content="刷新" 
-                                Command="{Binding RefreshPortsCommand}"
-                                Padding="10,5" Background="#FF6C757D" 
-                                Foreground="White" BorderThickness="0"/>
-                    </Grid>
+                                  SelectedItem="{Binding SelectedBaudRate}"/>
+                </Grid>
                 </GroupBox>
                 
                 <!-- 第二串口设置 -->
@@ -49,7 +42,6 @@
                             <ColumnDefinition Width="*" MinWidth="120"/>
                             <ColumnDefinition Width="Auto"/>
                             <ColumnDefinition Width="*" MinWidth="120"/>
-                            <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
                         
                         <TextBlock Grid.Column="0" Text="串口:" VerticalAlignment="Center" Margin="0,0,10,0"/>
@@ -61,14 +53,8 @@
                         <TextBlock Grid.Column="2" Text="波特率:" VerticalAlignment="Center" Margin="0,0,10,0"/>
                         <ComboBox Grid.Column="3"
                                   ItemsSource="{Binding BaudRates}"
-                                  SelectedItem="{Binding SecondSelectedBaudRate}"
-                                  Margin="0,0,20,0"/>
-                        
-                        <Button Grid.Column="4" Content="刷新" 
-                                Command="{Binding RefreshPortsCommand}"
-                                Padding="10,5" Background="#FF6C757D" 
-                                Foreground="White" BorderThickness="0"/>
-                    </Grid>
+                                  SelectedItem="{Binding SecondSelectedBaudRate}"/>
+                </Grid>
                 </GroupBox>
                 
                 <!-- TCP设置 -->
@@ -90,7 +76,7 @@
                         <TextBox Grid.Column="3"
                                  Text="{Binding TcpPort}"
                                  Padding="5"/>
-                    </Grid>
+                </Grid>
                 </GroupBox>
                 
                 <!-- IMU配置 -->
@@ -113,28 +99,12 @@
                         <ComboBox Grid.Column="3"
                                   ItemsSource="{Binding Ranges}"
                                   SelectedIndex="1"/>
-                    </Grid>
+                </Grid>
                 </GroupBox>
             </StackPanel>
             
             <!-- 配置按钮 - 改为自适应布局 -->
             <WrapPanel Grid.Row="2" Orientation="Horizontal">
-                <Button Content="连接设备" 
-                        Command="{Binding ConnectCommand}"
-                        Padding="15,8" 
-                        Margin="0,0,10,5" 
-                        MinWidth="80"
-                        Background="#FF28A745" 
-                        Foreground="White" 
-                        BorderThickness="0"/>
-                <Button Content="断开连接" 
-                        Command="{Binding DisconnectCommand}"
-                        Padding="15,8" 
-                        Margin="0,0,10,5" 
-                        MinWidth="80"
-                        Background="#FFDC3545" 
-                        Foreground="White" 
-                        BorderThickness="0"/>
                 <Button Content="刷新端口" 
                         Command="{Binding RefreshPortsCommand}"
                         Padding="15,8" 

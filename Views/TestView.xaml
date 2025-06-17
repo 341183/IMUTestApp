@@ -99,6 +99,7 @@
                         <ColumnDefinition Width="*"/>
                         <ColumnDefinition Width="Auto"/>
                         <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="Auto"/>
                     </Grid.ColumnDefinitions>
                     <Grid Grid.Column="0">
                         <TextBox x:Name="ProductCodeTextBox"
@@ -107,7 +108,8 @@
                                  Padding="10" 
                                  Margin="0,0,10,0"
                                  VerticalAlignment="Center"
-                                 KeyDown="ProductCodeTextBox_KeyDown"/>
+                                 KeyDown="ProductCodeTextBox_KeyDown"
+                                 TextChanged="ProductCodeTextBox_TextChanged"/>
                         <TextBlock Text="请输入或扫描产品编码" 
                                    FontSize="14" 
                                    Padding="10" 
@@ -143,6 +145,16 @@
                     </StackPanel>
                     
                     <Button Grid.Column="2" 
+                            Content="停止测试" 
+                            Command="{Binding StopTestCommand}"
+                            Padding="12,8" 
+                            MinWidth="80"
+                            Background="#FFDC3545" 
+                            Foreground="White" 
+                            BorderThickness="0"
+                            Margin="0,0,10,0"/>
+                    
+                    <Button Grid.Column="3" 
                             Content="清除" 
                             Command="{Binding ClearProductCodeCommand}"
                             Padding="12,8" 
@@ -214,6 +226,8 @@
                     <!-- 数据内容 -->
                     <TextBox Grid.Row="1" 
                              Text="{Binding DataDisplay, Mode=OneWay}" 
+                             x:Name="DataDisplayTextBox"
+                             TextChanged="DataDisplayTextBox_TextChanged"
                              IsReadOnly="True" 
                              Background="White" 
                              BorderThickness="0" 
